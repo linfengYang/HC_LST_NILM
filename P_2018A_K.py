@@ -1,30 +1,19 @@
-#------------------------------------
-# Author: Xinqi Zhu
-# Please cite paper https://arxiv.org/abs/1709.09890 if you use this code
-#------------------------------------
 import tensorflow as tf
 import numpy as np
 from sklearn.metrics import accuracy_score
 import os
-# from keras.datasets import cifar10
 from keras.models import Model
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, Input,Reshape,Add
 from keras.layers import Dense, Flatten, Dropout,DepthwiseConv2D, Layer, GlobalAveragePooling1D, Input, RandomCrop, RandomFlip, Embedding,LayerNormalization,Activation
-# from keras.initializers import he_normal
 from keras import optimizers
 from keras.callbacks import LearningRateScheduler, TensorBoard
-# from tensorflow.keras.layers.normalization import BatchNormalization
-# from tensorflow.keras.layers.normalization.batch_normalization_v1 import BatchNormalization
-# from tensorflow.keras.layers import normalization
 from keras.layers import BatchNormalization
-# from tensorflow.keras.utils.data_utils import get_file
 from keras.utils import get_file
 from keras import backend as K
 from scipy.io import loadmat
 import seaborn as sn
 import pandas as pd
-# import tensorflow as tf
 from keras import layers, models
 from keras.losses import categorical_crossentropy
 from sklearn import preprocessing
