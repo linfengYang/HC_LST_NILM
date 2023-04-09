@@ -1,30 +1,19 @@
-#------------------------------------
-# Author: Xinqi Zhu
-# Please cite paper https://arxiv.org/abs/1709.09890 if you use this code
-#------------------------------------
 import tensorflow as tf
 import numpy as np
 from sklearn.metrics import accuracy_score
 import os
-# from keras.datasets import cifar10
 from keras.models import Model
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, Input,Reshape,Add
 from keras.layers import Dense, Flatten, Dropout, Layer, GlobalAveragePooling1D, Input, RandomCrop, RandomFlip, Embedding,LayerNormalization,Activation
-# from keras.initializers import he_normal
 from keras import optimizers
 from keras.callbacks import LearningRateScheduler, TensorBoard
-# from tensorflow.keras.layers.normalization import BatchNormalization
-# from tensorflow.keras.layers.normalization.batch_normalization_v1 import BatchNormalization
-# from tensorflow.keras.layers import normalization
 from keras.layers import BatchNormalization
-# from tensorflow.keras.utils.data_utils import get_file
 from keras.utils import get_file
 from keras import backend as K
 from scipy.io import loadmat
 import seaborn as sn
 import pandas as pd
-# import tensorflow as tf
 from keras import layers, models
 from keras.losses import categorical_crossentropy
 from sklearn import preprocessing
@@ -49,14 +38,12 @@ import numpy as np
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow import keras
-# from keras.activations import softmax
 EPOCHS = 60 # 100  # ---
 EPOCHS_LENET = 10
 IMG_WIDTH = 56 # 128
 IMG_HEIGHT = 56 # 128
 NUM_CATEGORIES = 55
-INPUT_IMAGE_DIR = "images/VI_images_test/Whited/"  # "images/v-i_images/valid_images/"  # VI图片路径
-# INPUT_RGBIMAGE_DIR = 'submetered_new/RGB_VI_image_png/'
+INPUT_IMAGE_DIR = "images/VI_images_test/Whited/"  
 INPUT_MODEL_DIR = "models"
 OUTPUT_MODEL_DIR = "models"
 SAVE_DIR = "images"
@@ -137,14 +124,14 @@ def load_data(data_dir):
     images = []
     labels = []
     labels_literal = []
-    for category in os.listdir(data_dir):  # 返回指定路径下的文件和文件夹列表
-        for img_file in os.listdir(os.path.join(data_dir, category)):  # data_dir/category
-            img = cv2.imread(os.path.join(data_dir, category, img_file))  # 读进来直接是BGR 格式数据格式在 0~255
+    for category in os.listdir(data_dir):  
+        for img_file in os.listdir(os.path.join(data_dir, category)):  
+            img = cv2.imread(os.path.join(data_dir, category, img_file))  
             # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # cv2.COLOR_BGR2GRAY 将BGR格式转换成灰度图片
-            img = np.array(img)  # 效果：result.shape=[width,height,channels]
+            img = np.array(img)  
             images.append(img)
-            labels.append(str(category))  # 一个文件夹为一类
-        labels_literal.append(str(category))  # 总共有多少个文件夹，即总共有多少个类
+            labels.append(str(category)) 
+        labels_literal.append(str(category))  
     return (images, labels), labels_literal
 def load_data_1(data_dir):
     Class = ['AC', 'AirPump', 'BenchGrinder', 'CableModem', 'CableReceiver', 'CFL', 'Charger',
@@ -164,7 +151,7 @@ def load_data_1(data_dir):
             for img in os.listdir(path):
                 try:
                     img_arr = cv2.imread(os.path.join(path, img))
-                    # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY)  # 若是3通道的图片，则会转成单通道图片
+                    # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY)  
                     new_arr = cv2.resize(img_arr, (IMG_SZ, IMG_SZ))
                     # print('new_arr:',new_arr.shape)
                     trn_data.append([new_arr, class_num])
@@ -181,15 +168,14 @@ def load_data_1(data_dir):
     return (X, y), Class
 def process_data_VI_Images(k_folds=True):
     le = preprocessing.LabelEncoder()
-    # (images, labels), labels_literal = load_data(INPUT_IMAGE_DIR) # INPUT_IMAGE_DIR = "images/v-i_images/valid_images/"  # VI图片路径
-    (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR) # INPUT_IMAGE_DIR = "images/v-i_images/valid_images/"  # VI图片路径
+    (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR)
     X = np.array(images)
     print('X[0]-----before:', X[0])
     X = X/255  # 对图片进行归一化
     print('X[0]-----after:', X[0])
     Y = np.array(labels)
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  # 记住n_splits可以改-------------------------------------
-    # KFold是用于生成交叉验证的数据集的，而StratifiedKFold则是在KFold的基础上，加入了分层抽样的思想，使得测试集和训练集有相同的数据分布，因此表现在算法上，StratifiedKFold需要同时输入数据和标签，便于统一训练集和测试集的分布
+    skf = StratifiedKFold(n_splits=5, shuffle=True)  #-------------------------------------
+
     i = 0
     X_train = []
     X_test = []
@@ -197,29 +183,27 @@ def process_data_VI_Images(k_folds=True):
     Y_test = []
     Y_train_literal = []
     Y_test_literal = []
-    for train_index, test_index in skf.split(X, Y):  # skf.split(X,y)返回的是训练集和测试集的索引值  ？？？？测试和训练都是同一类？？
-        # print('train_index:', train_index)
-        # print('test_index:', test_index)  # 返回一个数组
+    for train_index, test_index in skf.split(X, Y): 
         X_train.append(X[train_index])
         X_test.append(X[test_index])
         Y_train_literal.append(Y[train_index])
         Y_test_literal.append(Y[test_index])
 
-        X_train[i] = X_train[i].reshape(X_train[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  # 原图片尺寸是？ reshape成128*128的
-        X_test[i] = X_test[i].reshape(X_test[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  # 为什么仅数组内的一个i需要转换图片格式
-        le.fit(Y_test_literal[i])  # 它获取一个分类列，并将其转换/映射为数值
+        X_train[i] = X_train[i].reshape(X_train[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  
+        X_test[i] = X_test[i].reshape(X_test[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3) 
+        le.fit(Y_test_literal[i]) 
         # print('X_train[i].shape[0]:', X_train[i].shape[0])  # 5484
         # print('Y_test_literal[i]:', le.fit(Y_test_literal[i]))
-        Y_test.append(le.transform(Y_test_literal[i]))  # 可以使用le.fit()中确定的映射来转换测试数据中的标签列
+        Y_test.append(le.transform(Y_test_literal[i]))  
         # print('le.transform(Y_test_literal[i]):', le.transform(Y_test_literal[i]))
-        le.fit(Y_train_literal[i])  # ？这样生成的类标签数值不是乱了？
+        le.fit(Y_train_literal[i]) 
         print('Y_train_literal[i]:', le.fit(Y_train_literal[i]))
         Y_train.append(le.transform(Y_train_literal[i]))  #
         print('le.transform(Y_train_literal[i]):', le.transform(Y_train_literal[i]))
         num_classes = 55
-        Y_train[i] = to_categorical(Y_train[i], num_classes).astype('int')  # (类似one hot编码？)将每一类的标签转成数组，是哪一类就为1，其余位置为0
+        Y_train[i] = to_categorical(Y_train[i], num_classes).astype('int')  
         Y_test[i] = to_categorical(Y_test[i], num_classes).astype('int')
-        i += 1  # ？？？i的作用是啥
+        i += 1  
         if k_folds == False:
             break
 
@@ -494,7 +478,7 @@ class SwinTransformer(layers.Layer):
         self.drop_path = DropPath(dropout_rate)
         self.norm2 = layers.LayerNormalization(epsilon=1e-5)
 
-        self.mlp = keras.Sequential(  # 可改进--------------------------------------------------
+        self.mlp = keras.Sequential(  # --------------------------------------------------
             [
                 layers.Dense(num_mlp),
                 layers.Activation(keras.activations.gelu),
