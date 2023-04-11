@@ -78,7 +78,7 @@ epochs = 80  # 75 or 90
 
 #--- file paths ---
 log_filepath = './tb_log_medium_dynamic/'
-weights_store_filepath = './models/'   # B_CNN
+weights_store_filepath = './models/'  
 train_id = '1'
 model_name = 'BCNN_SVHN'+train_id
 model_path = os.path.join(weights_store_filepath, model_name)
@@ -175,7 +175,7 @@ def load_data_1(data_dir):
     return (X, y), Class
 def process_data_VI_Images(k_folds=True):
     le = preprocessing.LabelEncoder()
-    (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR) # INPUT_IMAGE_DIR = "images/v-i_images/valid_images/"  
+    (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR) 
     X = np.array(images)
     print('X[0]-----before:', X[0])
     X = X/255 
@@ -192,8 +192,6 @@ def process_data_VI_Images(k_folds=True):
     Y_train_literal = []
     Y_test_literal = []
     for train_index, test_index in skf.split(X, Y):  
-        # print('train_index:', train_index)
-        # print('test_index:', test_index) 
         X_train.append(X[train_index])
         X_test.append(X[test_index])
         Y_train_literal.append(Y[train_index])
@@ -202,10 +200,7 @@ def process_data_VI_Images(k_folds=True):
         X_train[i] = X_train[i].reshape(X_train[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3) 
         X_test[i] = X_test[i].reshape(X_test[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  
         le.fit(Y_test_literal[i])  
-        # print('X_train[i].shape[0]:', X_train[i].shape[0])  
-        # print('Y_test_literal[i]:', le.fit(Y_test_literal[i]))
         Y_test.append(le.transform(Y_test_literal[i]))  
-        # print('le.transform(Y_test_literal[i]):', le.transform(Y_test_literal[i]))
         le.fit(Y_train_literal[i])  
         print('Y_train_literal[i]:', le.fit(Y_train_literal[i]))
         Y_train.append(le.transform(Y_train_literal[i]))  
@@ -581,10 +576,9 @@ for i in range(len(y_train)):
 for i in range(len(y_train)):
     for j in range(y_c2_train[i].shape[0]):
       y_c2_train[i][j, parent_f[np.argmax(y_train[i][j])]] = 1 
-      # print("parent_f[np.argmax(y_c2_train[i])]:", parent_f[np.argmax(y_c2_train[i])])
 for i in range(len(y_train)):
     for j in range(y_c2_test[i].shape[0]):
-      y_c2_test[i][j, parent_f[np.argmax(y_test[i][j])]] = 1  # ???  图片数量可能会引起问题
+      y_c2_test[i][j, parent_f[np.argmax(y_test[i][j])]] = 1 
 parent_c2 = {
   0:0, 1:0,
   2:1, 3:1
@@ -606,7 +600,7 @@ for i in range(len(y_test)):
 def get_net_model(alpha, beta, gamma):
     img_input = Input(shape=input_shape, name='input')
     # -----------------swin transformer-------------------------
-    img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
+    img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input) 
     img_input = layers.RandomRotation(0.2)(img_input)
     y_input = layers.RandomFlip("horizontal_and_vertical")(img_input) 
     y_1 = PatchExtract(patch_size)(y_input)
@@ -642,25 +636,19 @@ def get_net_model(alpha, beta, gamma):
     x = BatchNormalization()(x)
 
     # --- coarse 1 branch ---
-    # c_1_bch = layers.GlobalAveragePooling2D()(x)
     c_1_bch = Flatten(name='c1_flatten')(x)
     c_1_bch = Dense(32, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
     c_1_bch = BatchNormalization()(c_1_bch)
-    # c_1_bch = Dropout(0.2)(c_1_bch)
     c_1_pred = Dense(num_c_1, activation='softmax', name='c1_p')(c_1_bch)
-    # print('coarse 1.c_1_pred.shape:', c_1_pred.shape)  # coarse 1.c_1_pred.shape: (None, 2)
 
     # --- block 2 ---
     x = Conv2D(28, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
     x = BatchNormalization()(x)
     x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
     x = BatchNormalization()(x)
-    # x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
-    # print('block 2.x.shape:', x.shape)  # block 2.x.shape: (None, 8, 8, 128)
 
     ST1 = Reshape((56, 56, 16))(ST1)
     ST1_brunch = ST1
-    # print('ST1.shape:', ST1)  # (None, 196, 128)
     ST1 = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv3')(ST1)
     ST1 = BatchNormalization()(ST1)
 
@@ -671,27 +659,17 @@ def get_net_model(alpha, beta, gamma):
     c_2_bch = BatchNormalization()(c_2_bch)
     c_2_bch = Dropout(0.2)(c_2_bch)
     c_2_pred = Dense(num_c_2, activation='softmax', name='c2_p')(c_2_bch)
-    # print('coarse 2.c_2_pred.shape:', c_2_pred.shape)  # coarse 2.c_2_pred.shape: (None, 7)
 
     # --- block 3 ---
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x_out)
     x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block2_conv4')(x)
     x = BatchNormalization()(x)
-    # print('block 3.x.shape:', x.shape)  # (28,28,64)
 
     # --- block 4 ---
     # --- fine block ---
 
-    # # -------
-    # ST1_brunch = Conv2D(16, (3, 3), activation='relu', padding='same', name='block4_convn')(ST1_brunch)
-    # ST1_brunch = Reshape((28, 28, 64))(ST1_brunch)
-    # # -------
-
     ST2 = Reshape((28, 28, 64))(ST2)
 
-    # # -------
-    # ST2 = Add()([ST1_brunch,ST2])
-    # # -------
     # shuffleNet---------------------------------
     ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
                                strides=(1, 1),
@@ -720,17 +698,12 @@ def get_net_model(alpha, beta, gamma):
     # shuffleNet---------------------------------
 
     ST2 = Add()([ST2, x])
-    # print('fine block.x.shape:', ST2.shape)  # fine block.x.shape: (None, 56, 56, 32)
     ST2 = Flatten(name='ST2_flatten')(ST2)
     ST2 = Dense(128, activation='relu', name='fine_fc1')(ST2)
     ST2 = Dropout(0.3)(ST2)
-    # ST2 = Dense(64, activation='relu', name='fine_fc2')(ST2)
-    # ST2 = Dropout(0.2)(ST2)
-    output = layers.Dense(units=NUM_CATEGORIES, activation='softmax', name="last_layer")(ST2)  # 模型的最后一层
+    output = layers.Dense(units=NUM_CATEGORIES, activation='softmax', name="last_layer")(ST2) 
 
-    # complete_model = tf.keras.Model(inputs=VI_model.input, outputs=output)
     model = Model(inputs=img_input, outputs=[c_1_pred, c_2_pred, output], name='medium_dynamic')
-    # model.summary()
     sgd = SGD(lr=0.003, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer=sgd,
@@ -739,9 +712,9 @@ def get_net_model(alpha, beta, gamma):
                   metrics=['acc'])
     return model
 #----------------------- model definition ---------------------------
-alpha = K.variable(value=0.98, dtype="float32", name="alpha") # A1 in paper
-beta = K.variable(value=0.01, dtype="float32", name="beta") # A2 in paper
-gamma = K.variable(value=0.01, dtype="float32", name="gamma") # A3 in paper
+alpha = K.variable(value=0.98, dtype="float32", name="alpha") 
+beta = K.variable(value=0.01, dtype="float32", name="beta")
+gamma = K.variable(value=0.01, dtype="float32", name="gamma") 
 
 #----------------------- compile and fit ---------------------------
 tb_cb = TensorBoard(log_dir=log_filepath, histogram_freq=0)
@@ -757,7 +730,7 @@ mcc_total = []
 for i in range(len(x_train)):
     model = get_net_model(alpha, beta, gamma)
     history.append(model.fit(x_train[i], [y_c1_train[i], y_c2_train[i], y_train[i]],
-                            batch_size=64,  # 128
+                            batch_size=128,  # 128
                             epochs=epochs,
                             verbose=1,
                             callbacks=cbks,
