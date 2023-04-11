@@ -38,14 +38,12 @@ import numpy as np
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow import keras
-# from keras.activations import softmax
-EPOCHS = 60 # 100  # ---
+EPOCHS = 60 
 EPOCHS_LENET = 10
-IMG_WIDTH = 56 # 128
-IMG_HEIGHT = 56 # 128
+IMG_WIDTH = 56 
+IMG_HEIGHT = 56 
 NUM_CATEGORIES = 13
-INPUT_IMAGE_DIR = "images/VI_images_test/2018Agg_one/"  # "images/v-i_images/valid_images/"  # VI图片路径
-# INPUT_RGBIMAGE_DIR = 'submetered_new/RGB_VI_image_png/'
+INPUT_IMAGE_DIR = "images/VI_images_test/2018Agg_one/" 
 INPUT_MODEL_DIR = "models"
 OUTPUT_MODEL_DIR = "models"
 SAVE_DIR = "images"
@@ -72,7 +70,7 @@ epochs = 75 # 60
 
 #--- file paths ---
 log_filepath = './tb_log_medium_dynamic/'
-weights_store_filepath = './models/'   # B_CNN
+weights_store_filepath = './models/'  
 train_id = '1'
 model_name = 'BCNN_SVHN'+train_id
 model_path = os.path.join(weights_store_filepath, model_name)
@@ -80,9 +78,9 @@ model_path = os.path.join(weights_store_filepath, model_name)
 def scheduler(epoch):
   learning_rate_init = 0.003
   if epoch > 50:
-    learning_rate_init = 0.002 # 0.0005   # 调整成 0.001？
+    learning_rate_init = 0.0018
   if epoch > 70:
-    learning_rate_init = 0.001 # 0.0001   # 调整成 0.0007？
+    learning_rate_init = 0.0006
   return learning_rate_init
 
 class LossWeightsModifier(tf.keras.callbacks.Callback):
@@ -107,12 +105,6 @@ class LossWeightsModifier(tf.keras.callbacks.Callback):
       K.set_value(self.alpha, 0)
       K.set_value(self.beta, 0)
       K.set_value(self.gamma, 1)
-def import_model():
-    print('请输入训练好的的模型进行测试：')
-    filename = input("\nModel name: ")
-    model = tf.keras.models.load_model(f"{INPUT_MODEL_DIR}/{filename}")  # {filename}.h5")
-    model.summary()
-    return model
 def load_data(data_dir):
     """
     Load image data from directory `data_dir`.
@@ -130,14 +122,14 @@ def load_data(data_dir):
     images = []
     labels = []
     labels_literal = []
-    for category in os.listdir(data_dir):  # 返回指定路径下的文件和文件夹列表
-        for img_file in os.listdir(os.path.join(data_dir, category)):  # data_dir/category
-            img = cv2.imread(os.path.join(data_dir, category, img_file))  # 读进来直接是BGR 格式数据格式在 0~255
+    for category in os.listdir(data_dir): 
+        for img_file in os.listdir(os.path.join(data_dir, category)): 
+            img = cv2.imread(os.path.join(data_dir, category, img_file)) 
             # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # cv2.COLOR_BGR2GRAY 将BGR格式转换成灰度图片
-            img = np.array(img)  # 效果：result.shape=[width,height,channels]
+            img = np.array(img)  
             images.append(img)
-            labels.append(str(category))  # 一个文件夹为一类
-        labels_literal.append(str(category))  # 总共有多少个文件夹，即总共有多少个类
+            labels.append(str(category)) 
+        labels_literal.append(str(category)) 
     return (images, labels), labels_literal
 def load_data_1(data_dir):
     Class = ['Air Conditioner', 'Blender','Coffee maker', 'Compact Fluorescent Lamp', 'Fan', 'Fridge', 'Fridge defroster',
@@ -152,7 +144,7 @@ def load_data_1(data_dir):
             for img in os.listdir(path):
                 try:
                     img_arr = cv2.imread(os.path.join(path, img))
-                    # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY)  # 若是3通道的图片，则会转成单通道图片
+                    # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY) 
                     new_arr = cv2.resize(img_arr, (IMG_SZ, IMG_SZ))
                     # print('new_arr:',new_arr.shape)
                     trn_data.append([new_arr, class_num])
@@ -169,17 +161,13 @@ def load_data_1(data_dir):
     return (X, y), Class
 def process_data_VI_Images(k_folds=True):
     le = preprocessing.LabelEncoder()
-    # (images, labels), labels_literal = load_data(INPUT_IMAGE_DIR) # INPUT_IMAGE_DIR = "images/v-i_images/valid_images/"  # VI图片路径
-    (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR) # INPUT_IMAGE_DIR = "images/v-i_images/valid_images/"  # VI图片路径
+    (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR) 
     X = np.array(images)
     print('X[0]-----before:', X[0])
-    X = X/255  # 对图片进行归一化
+    X = X/255
     print('X[0]-----after:', X[0])
     Y = np.array(labels)
-    skf = StratifiedKFold(n_splits=10, shuffle=True)  # 记住n_splits可以改-------------------------------------
-    # k = 10
-    # skf = KFold(k)
-    # KFold是用于生成交叉验证的数据集的，而StratifiedKFold则是在KFold的基础上，加入了分层抽样的思想，使得测试集和训练集有相同的数据分布，因此表现在算法上，StratifiedKFold需要同时输入数据和标签，便于统一训练集和测试集的分布
+    skf = StratifiedKFold(n_splits=10, shuffle=True)  # -------------------------------------
     i = 0
     X_train = []
     X_test = []
@@ -187,29 +175,25 @@ def process_data_VI_Images(k_folds=True):
     Y_test = []
     Y_train_literal = []
     Y_test_literal = []
-    for train_index, test_index in skf.split(X, Y):  # skf.split(X,y)返回的是训练集和测试集的索引值  ？？？？测试和训练都是同一类？？
-        # print('train_index:', train_index)
-        # print('test_index:', test_index)  # 返回一个数组
+    for train_index, test_index in skf.split(X, Y): 
         X_train.append(X[train_index])
         X_test.append(X[test_index])
         Y_train_literal.append(Y[train_index])
         Y_test_literal.append(Y[test_index])
 
-        X_train[i] = X_train[i].reshape(X_train[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  # 原图片尺寸是？ reshape成128*128的
-        X_test[i] = X_test[i].reshape(X_test[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  # 为什么仅数组内的一个i需要转换图片格式
-        le.fit(Y_test_literal[i])  # 它获取一个分类列，并将其转换/映射为数值
-        # print('X_train[i].shape[0]:', X_train[i].shape[0])  # 5484
-        # print('Y_test_literal[i]:', le.fit(Y_test_literal[i]))
-        Y_test.append(le.transform(Y_test_literal[i]))  # 可以使用le.fit()中确定的映射来转换测试数据中的标签列
-        # print('le.transform(Y_test_literal[i]):', le.transform(Y_test_literal[i]))
-        le.fit(Y_train_literal[i])  # ？这样生成的类标签数值不是乱了？
+        X_train[i] = X_train[i].reshape(X_train[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  
+        X_test[i] = X_test[i].reshape(X_test[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3) 
+        le.fit(Y_test_literal[i]) 
+     
+        Y_test.append(le.transform(Y_test_literal[i])) 
+        le.fit(Y_train_literal[i]) 
         print('Y_train_literal[i]:', le.fit(Y_train_literal[i]))
         Y_train.append(le.transform(Y_train_literal[i]))  #
         print('le.transform(Y_train_literal[i]):', le.transform(Y_train_literal[i]))
         num_classes = 13
-        Y_train[i] = to_categorical(Y_train[i], num_classes).astype('int')  # (类似one hot编码？)将每一类的标签转成数组，是哪一类就为1，其余位置为0
+        Y_train[i] = to_categorical(Y_train[i], num_classes).astype('int') 
         Y_test[i] = to_categorical(Y_test[i], num_classes).astype('int')
-        i += 1  # ？？？i的作用是啥
+        i += 1  
         if k_folds == False:
             break
 
@@ -226,7 +210,7 @@ def save_model(model=None):
         filename = input("\nModel name: ")
         if not os.path.exists(f"{OUTPUT_MODEL_DIR}"):
             os.makedirs(f"{OUTPUT_MODEL_DIR}/")
-        model.save(f"{OUTPUT_MODEL_DIR}/{filename}", save_format='tf')  # {filename}.h5", save_format='h5')
+        model.save(f"{OUTPUT_MODEL_DIR}/{filename}", save_format='tf') 
         print(f"Model saved in '{OUTPUT_MODEL_DIR}'\n")
     else:
         n=-1
@@ -238,7 +222,7 @@ def save_summary(model, filename):
         model.summary(print_fn=lambda x: f.write(x + '\n'))
     print(f"Model summary saved in '{OUTPUT_MODEL_DIR}/models_summaries/'\n")
 
-# ------------------ swim transformer ------------------------------------------
+# ------------------ swin transformer ------------------------------------------
 patch_size = (2, 2)  # 2-by-2 sized patches
 dropout_rate = 0.03  # Dropout rate
 num_heads = 8  # Attention heads
@@ -434,7 +418,7 @@ class SwinTransformer(layers.Layer):
         self.drop_path = DropPath(dropout_rate)
         self.norm2 = layers.LayerNormalization(epsilon=1e-5)
 
-        self.mlp = keras.Sequential(  # 可改进--------------------------------------------------
+        self.mlp = keras.Sequential(  # --------------------------------------------------
             [
                 layers.Dense(num_mlp),
                 layers.Activation(keras.activations.gelu),
@@ -578,11 +562,11 @@ class PatchMerging(tf.keras.layers.Layer):
         x = tf.concat((x0, x1, x2, x3), axis=-1)
         x = tf.reshape(x, shape=(-1, (height // 2) * (width // 2), 4 * C))
         return self.linear_trans(x)
-# ------------------ swim transformer --------------------------------------
+# ------------------ swin transformer --------------------------------------
 
 
 #---------------- data preprocessiong -------------------
-x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=True)  # K 对val数值影响很大
+x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=True)  
 
 
 #---------------------- make coarse 2 labels --------------------------
@@ -600,11 +584,7 @@ y_c2_test = []
 for i in range(len(y_train)):
     y_c2_train.append(np.zeros((y_train[i].shape[0], num_c_2)))
     y_c2_test.append(np.zeros((y_test[i].shape[0], num_c_2)))
-print('y_train.shape[0]:',y_train[0].shape[0]) #  1407
-print('y_test.shape[0]:',y_test[0].shape[0]) # 469
-print('y_c2_train.shape:', y_c2_train[0].shape)  # y_c2_train.shape: (1407, 4)
-print('y_c2_test.shape:', y_c2_test[0].shape)  # (469, 4)
-print('y_c2_test.shape[0]:', y_c2_test[0].shape[0])  # 469
+    
 for i in range(len(y_train)):
     for j in range(y_c2_train[i].shape[0]):
       y_c2_train[i][j, parent_f[np.argmax(y_train[i][j])]] = 1 
@@ -633,14 +613,11 @@ for i in range(len(y_test)):
 def get_net_model(alpha, beta, gamma):
     img_input = Input(shape=input_shape, name='input')
     # -----------------swim transformer-------------------------
-    # y = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
-    # print('x.shape:', y)  # (None, 32,32, 3)
-    y = layers.RandomFlip("horizontal")(img_input)
-    print('x.shape:', y)  # ne
+    img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
+    img_input = layers.RandomRotation(0.2)(img_input)
+    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input)  # 'horizontal_and_vertical'
     y = PatchExtract(patch_size)(y)
-    print('x.shape:', y)  # (None, 256, 12)
     y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y)
-    print('x.shape:', y)  # (None, 784, 64)
     ST1 = SwinTransformer(
         dim=embed_dim,  # ----------------
         num_patch=(num_patch_x, num_patch_y),
@@ -651,7 +628,7 @@ def get_net_model(alpha, beta, gamma):
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(y)
-    print('x.shape:', y)  # (None, 784, 64)
+    print('x.shape:', y)  
     ST2 = SwinTransformer(
         dim=embed_dim,  # ----------------------
         num_patch=(num_patch_x, num_patch_y),
@@ -662,10 +639,9 @@ def get_net_model(alpha, beta, gamma):
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(ST1)
-    print('x.shape:', ST2)  # (None, 784, 64)
     # ST2 = PatchMerging((num_patch_x, num_patch_y), embed_dim=embed_dim)(ST2)
     # print('x.shape:', ST2)  # (None, 196, 128)
-    # -----------------swim transformer-------------------------
+    # -----------------swin transformer-------------------------
 
     # --- block 1 ---
     x = Conv2D(12, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
@@ -675,7 +651,6 @@ def get_net_model(alpha, beta, gamma):
     x = BatchNormalization()(x)
 
     # --- coarse 1 branch ---
-    # c_1_bch = layers.GlobalAveragePooling2D()(x)
     c_1_bch = Flatten(name='c1_flatten')(x)
     c_1_bch = Dense(32, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
     c_1_bch = BatchNormalization()(c_1_bch)
@@ -688,8 +663,6 @@ def get_net_model(alpha, beta, gamma):
     x = BatchNormalization()(x)
     x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
     x = BatchNormalization()(x)
-    # x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
-    print('block 2.x.shape:', x.shape)  # block 2.x.shape: (None, 8, 8, 128)
 
     ST1 = Reshape((56, 56, 16))(ST1)
     ST1_brunch = ST1
@@ -714,11 +687,6 @@ def get_net_model(alpha, beta, gamma):
 
     # --- block 4 ---
     # --- fine block ---
-
-    # # -------
-    # ST1_brunch = Conv2D(16, (3, 3), activation='relu', padding='same', name='block4_convn')(ST1_brunch)
-    # ST1_brunch = Reshape((28, 28, 64))(ST1_brunch)
-    # # -------
 
     ST2 = Reshape((28, 28, 64))(ST2)
 
