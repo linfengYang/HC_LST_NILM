@@ -38,10 +38,10 @@ import numpy as np
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow import keras
-EPOCHS = 60 # 100  # ---
+EPOCHS = 60
 EPOCHS_LENET = 10
-IMG_WIDTH = 56 # 128
-IMG_HEIGHT = 56 # 128
+IMG_WIDTH = 56
+IMG_HEIGHT = 56 
 NUM_CATEGORIES = 55
 INPUT_IMAGE_DIR = "images/VI_images_test/Whited/"  
 INPUT_MODEL_DIR = "models"
@@ -70,7 +70,7 @@ epochs = 85 # 60
 
 #--- file paths ---
 log_filepath = './tb_log_medium_dynamic/'
-weights_store_filepath = './models/'   # B_CNN
+weights_store_filepath = './models/'  
 train_id = '1'
 model_name = 'BCNN_SVHN'+train_id
 model_path = os.path.join(weights_store_filepath, model_name)
@@ -78,9 +78,9 @@ model_path = os.path.join(weights_store_filepath, model_name)
 def scheduler(epoch):
   learning_rate_init = 0.003
   if epoch > 50:
-    learning_rate_init = 0.002 # 0.0005   # 调整成 0.001？
+    learning_rate_init = 0.0018
   if epoch > 70:
-    learning_rate_init = 0.001 # 0.0001   # 调整成 0.0007？
+    learning_rate_init = 0.0006
   return learning_rate_init
 
 class LossWeightsModifier(tf.keras.callbacks.Callback):
@@ -153,7 +153,6 @@ def load_data_1(data_dir):
                     img_arr = cv2.imread(os.path.join(path, img))
                     # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY)  
                     new_arr = cv2.resize(img_arr, (IMG_SZ, IMG_SZ))
-                    # print('new_arr:',new_arr.shape)
                     trn_data.append([new_arr, class_num])
                 except Exception as e:
                     pass
@@ -171,7 +170,7 @@ def process_data_VI_Images(k_folds=True):
     (images, labels), labels_literal = load_data_1(INPUT_IMAGE_DIR)
     X = np.array(images)
     print('X[0]-----before:', X[0])
-    X = X/255  # 对图片进行归一化
+    X = X/255  
     print('X[0]-----after:', X[0])
     Y = np.array(labels)
     skf = StratifiedKFold(n_splits=5, shuffle=True)  #-------------------------------------
@@ -192,10 +191,7 @@ def process_data_VI_Images(k_folds=True):
         X_train[i] = X_train[i].reshape(X_train[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3)  
         X_test[i] = X_test[i].reshape(X_test[i].shape[0], IMG_HEIGHT, IMG_WIDTH, 3) 
         le.fit(Y_test_literal[i]) 
-        # print('X_train[i].shape[0]:', X_train[i].shape[0])  # 5484
-        # print('Y_test_literal[i]:', le.fit(Y_test_literal[i]))
         Y_test.append(le.transform(Y_test_literal[i]))  
-        # print('le.transform(Y_test_literal[i]):', le.transform(Y_test_literal[i]))
         le.fit(Y_train_literal[i]) 
         print('Y_train_literal[i]:', le.fit(Y_train_literal[i]))
         Y_train.append(le.transform(Y_train_literal[i]))  #
@@ -220,7 +216,7 @@ def save_model(model=None):
         filename = input("\nModel name: ")
         if not os.path.exists(f"{OUTPUT_MODEL_DIR}"):
             os.makedirs(f"{OUTPUT_MODEL_DIR}/")
-        model.save(f"{OUTPUT_MODEL_DIR}/{filename}", save_format='tf')  # {filename}.h5", save_format='h5')
+        model.save(f"{OUTPUT_MODEL_DIR}/{filename}", save_format='tf')
         print(f"Model saved in '{OUTPUT_MODEL_DIR}'\n")
     else:
         n=-1
@@ -246,9 +242,8 @@ def preprocess_test_VI_Images():
             for img in os.listdir(path):
                 try:
                     img_arr = cv2.imread(os.path.join(path, img))
-                    # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY)  # 若是3通道的图片，则会转成单通道图片
+                    # img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY) 
                     new_arr = cv2.resize(img_arr, (IMG_SZ, IMG_SZ))
-                    # print('new_arr:',new_arr.shape)
                     trn_data.append([new_arr, class_num])
                 except Exception as e:
                     pass
@@ -267,11 +262,6 @@ def preprocess_test_VI_Images():
 
     raw_images, raw_labels = np.asarray(X, dtype=np.float32), np.asarray(y, dtype=np.int32)
     raw_images = raw_images / 255.0
-    print('raw_labels:', raw_labels)
-    print('raw_labels.shape', raw_labels.shape)
-    print('raw_labels[4]:', raw_labels[4])
-    print('raw_labels[200]:', raw_labels[200])
-    # # one_hot编码
     one_hot_labels = to_categorical(raw_labels)
     X_train, X_test, y_train, y_test = train_test_split(raw_images, one_hot_labels, test_size=0.2, stratify=one_hot_labels)
     return X_train, X_test, y_train, y_test, labels_literal
@@ -622,54 +612,10 @@ class PatchMerging(tf.keras.layers.Layer):
         x = tf.concat((x0, x1, x2, x3), axis=-1)
         x = tf.reshape(x, shape=(-1, (height // 2) * (width // 2), 4 * C))
         return self.linear_trans(x)
-# ------------------ swim transformer --------------------------------------
+# ------------------ swin transformer --------------------------------------
 
-# (x_train, y_train), (x_test, y_test) = cifar10.load_data()
-# print('x_train.shape:',x_train.shape)  # (50000, 32, 32, 3)
-# print('y_train.shape:',y_train.shape)  # (50000, 1)
-# y_train = tf.keras.utils.to_categorical(y_train, num_classes)
-# y_test = tf.keras.utils.to_categorical(y_test, num_classes)
-# x_train = x_train.astype('float32')
-# x_test = x_test.astype('float32')
-# print('x_train:', len(x_train))
-#---------------- data preprocessiong -------------------
-# x_train = (x_train-np.mean(x_train)) / np.std(x_train)
-# x_test = (x_test-np.mean(x_test)) / np.std(x_test)
-# print('x_train.shape:',x_train.shape)  # (50000, 32, 32, 3)
-# print('x_test.shape:',x_test.shape)  # (10000, 32, 32, 3)
-
-# 加载VI轨迹数据集--------------------
-# x_train, x_test, y_train, y_test, labels_literal = preprocess_test_VI_Images()  # 第3步其实已经分出训练和测试集了
-# print('x_test的shape：', x_test.shape)  # (376, 56, 56, 3)
-# print('y_test的shape：', y_test.shape)  # (376, 16)
-# x_train = (x_train-np.mean(x_train)) / np.std(x_train)
-# x_test = (x_test-np.mean(x_test)) / np.std(x_test)
-# print('x_train.shape:', x_train.shape)  # (1500, 56, 56, 3)
-# print('x_test.shape:', x_test.shape)  # (376, 56, 56, 3)
-# print('y_train.shape:', y_train.shape)  # (1500, 16)
-
-
-x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=True)  # K 对val数值影响很大
-print('len(x_train):', len(x_train)) # 4
-print('len(x_test):', len(x_test)) # 4
-print('len(x_test[0]):', len(x_test[0]))  # 图片数量可能会引起问题
-print('len(x_test[1]):', len(x_test[1]))  # 
-print('len(x_test[2]):', len(x_test[2]))  # 
-print('len(x_test[3]):', len(x_test[3]))  #
-print('len(x_test[4]):', len(x_test[4]))  #
-print('y_train[1][400]:', y_train[1][400])  # [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0]
-print('y_train[1]:', y_train[1])
-print('(x_train):',(x_train))
-# x_train list:4 (1407,56,56,3)
-# x_test list:4 (469,56,56,3)
-# y_train list:4 (1407,16)
-# y_test list:4 (469,16)
+x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=True) 
 #---------------------- make coarse 2 labels --------------------------
-# parent_f = {
-#   2:3, 3:5, 5:5,
-#   1:2, 7:6, 4:6,
-#   0:0, 6:4, 8:1, 9:2
-# }
 parent_f = {
   5:4, 11:4, 14:4, 19:4,24:4, 25:4, 31:4, 37:4, 44:4,45:4, 51:4,
   30:3, 33:3,34:3, 35:3,36:3, 43:3,46:3, 48:3,50:3, 54:3,
@@ -678,71 +624,48 @@ parent_f = {
   1:0, 7:0, 8:0, 13:0, 18:0, 20:0, 21:0, 23:0, 26:0, 41:0, 42:0, 47:0, 53:0
 }
 
-# y_c2_train = np.zeros((len(y_train), y_train[0].shape[0], num_c_2)).astype("float32")
-# y_c2_test = np.zeros((len(y_train), y_test[0].shape[0], num_c_2)).astype("float32")
-y_c2_train = [np.zeros((y_train[0].shape[0], num_c_2)) for i in range(len(y_train))]
-y_c2_test = [np.zeros((y_test[0].shape[0], num_c_2)) for i in range(len(y_test))]
-print('y_train.shape[0]:',y_train[0].shape[0]) #  1407
-print('y_test.shape[0]:',y_test[0].shape[0]) # 469
-print('y_c2_train.shape:', y_c2_train[0].shape)  # y_c2_train.shape: (1407, 4)
-print('y_c2_test.shape:', y_c2_test[0].shape)  # (469, 4)
-print('y_c2_test.shape[0]:', y_c2_test[0].shape[0])  # 469
+y_c2_train = []
+y_c2_test = []
+for i in range(len(y_train)):
+    y_c2_train.append(np.zeros((y_train[i].shape[0], num_c_2)))
+    y_c2_test.append(np.zeros((y_test[i].shape[0], num_c_2)))
+
 for i in range(len(y_train)):
     for j in range(y_c2_train[i].shape[0]):
-      y_c2_train[i][j, parent_f[np.argmax(y_train[i][j])]] = 1  # 图片数量可能会引起问题
-      # print("parent_f[np.argmax(y_c2_train[i])]:", parent_f[np.argmax(y_c2_train[i])])
+      y_c2_train[i][j, parent_f[np.argmax(y_train[i][j])]] = 1 
 for i in range(len(y_train)):
     for j in range(y_c2_test[i].shape[0]):
-      y_c2_test[i][j, parent_f[np.argmax(y_test[i][j])]] = 1  # ???  图片数量可能会引起问题
-      # print("parent_f[np.argmax(y_c2_train[i])]:", parent_f[np.argmax(y_c2_train[i])])
-# for i in range(y_c2_test.shape[0]):
-#   y_c2_test[i][parent_f[np.argmax(y_test[i])]] = 1.0
-# print('y_c2_train.shape:', y_c2_train.shape)  # y_c2_train.shape: (50000, 7)
-# print('y_c2_test.shape:', y_c2_test.shape)  # y_c2_test.shape: (10000, 7)
+      y_c2_test[i][j, parent_f[np.argmax(y_test[i][j])]] = 1  
+
 #---------------------- make coarse 1 labels --------------------------
-# parent_c2 = {
-#   0:0, 1:0, 2:0,
-#   3:1, 4:1, 5:1, 6:1
-# }
 parent_c2 = {
   0:0,1:0,2:0,
   3:1, 4:1
 }
-# y_c1_train = np.zeros((y_c2_train.shape[0], num_c_1)).astype("float32")
-# y_c1_test = np.zeros((y_c2_test.shape[0], num_c_1)).astype("float32")
-y_c1_train = [np.zeros((y_c2_train[0].shape[0], num_c_1)) for i in range(len(y_train))]
-y_c1_test = [np.zeros((y_c2_test[0].shape[0], num_c_1)) for i in range(len(y_test))]
+y_c1_train = []
+y_c1_test = []
+for i in range(len(y_train)):
+    y_c1_train.append(np.zeros((y_c2_train[i].shape[0], num_c_1)))
+    y_c1_test.append(np.zeros((y_c2_test[i].shape[0], num_c_1)))
 for i in range(len(y_test)):
     for j in range(y_c1_train[i].shape[0]):
       y_c1_train[i][j, parent_c2[np.argmax(y_c2_train[i][j])]] = 1
-      # print("parent_f[np.argmax(y_c2_train[i])]:", parent_f[np.argmax(y_c2_train[i])])
 for i in range(len(y_test)):
     for j in range(y_c1_test[i].shape[0]):
       y_c1_test[i][j, parent_c2[np.argmax(y_c2_test[i][j])]] = 1
-      # print("parent_c2[np.argmax(y_c2_test[i][j])]:", parent_c2[np.argmax(y_c2_test[i][j])])
 
-# for i in range(y_c1_train.shape[0]):
-#   y_c1_train[i][parent_c2[np.argmax(y_c2_train[i])]] = 1.0
-#   print("parent_c2[np.argmax(y_c2_train[i])]:", parent_c2[np.argmax(y_c2_train[i])])
-# for i in range(y_c1_test.shape[0]):
-#   y_c1_test[i][parent_c2[np.argmax(y_c2_test[i])]] = 1.0
-
-# print('y_c1_train.shape:', y_c1_train.shape)  # y_c1_train.shape: (50000, 2)
-# print('y_c1_test.shape:', y_c1_test.shape)  # y_c1_test.shape: (10000, 2)
 Resnet_model = import_model()
-Resnet_model = tf.keras.models.Sequential(Resnet_model.layers[:-1])  # 删掉最后一层
+Resnet_model = tf.keras.models.Sequential(Resnet_model.layers[:-1])  
 for layer in Resnet_model.layers:
     layer.trainable = False
 
-# VI_model = get_model(x_train)  # 前面段的网络模型
 img_input = Input(shape=input_shape, name='input')
 
-# -----------------swim transformer-------------------------
-y = layers.RandomCrop(image_dimension, image_dimension)(img_input)
-print('x.shape:',y) # (None, 32,32, 3)
-y = layers.RandomFlip("horizontal")(y)
-print('x.shape:',y) # (None, 32,32, 3)
-y = PatchExtract(patch_size)(y)
+# -----------------swin transformer-------------------------
+img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
+img_input = layers.RandomRotation(0.2)(img_input)
+y_input = layers.RandomFlip("horizontal_and_vertical")(img_input) 
+y = PatchExtract(patch_size)(y_input)
 print('x.shape:',y) # (None, 256, 12)
 y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y)
 print('x.shape:',y) # (None, 784, 64)
