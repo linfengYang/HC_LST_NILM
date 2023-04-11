@@ -242,7 +242,7 @@ def save_summary(model, filename):
         model.summary(print_fn=lambda x: f.write(x + '\n'))
     print(f"Model summary saved in '{OUTPUT_MODEL_DIR}/models_summaries/'\n")
 
-# ------------------ swim transformer ------------------------------------------
+# ------------------ swin transformer ------------------------------------------
 patch_size = (2, 2)  # 2-by-2 sized patches
 dropout_rate = 0.03  # Dropout rate
 num_heads = 8  # Attention heads
@@ -418,7 +418,7 @@ class SwinTransformer(layers.Layer):
         self.drop_path = DropPath(dropout_rate)
         self.norm2 = layers.LayerNormalization(epsilon=1e-5)
 
-        self.mlp = keras.Sequential(  # 可改进--------------------------------------------------
+        self.mlp = keras.Sequential( 
             [
                 layers.Dense(num_mlp),
                 layers.Activation(keras.activations.gelu),
@@ -557,7 +557,7 @@ class PatchMerging(tf.keras.layers.Layer):
         x = tf.concat((x0, x1, x2, x3), axis=-1)
         x = tf.reshape(x, shape=(-1, (height // 2) * (width // 2), 4 * C))
         return self.linear_trans(x)
-# ------------------ swim transformer --------------------------------------
+# ------------------ swin transformer --------------------------------------
 
 
 #---------------- data preprocessiong -------------------
@@ -572,8 +572,6 @@ parent_f = {
   1:0, 7:0
 }
 
-# y_c2_train = [np.zeros((y_train[0].shape[0], num_c_2)) for i in range(len(y_train))]
-# y_c2_test = [np.zeros((y_test[0].shape[0], num_c_2)) for i in range(len(y_test))]
 y_c2_train = []
 y_c2_test = []
 for i in range(len(y_train)):
@@ -591,8 +589,7 @@ parent_c2 = {
   0:0, 1:0,
   2:1, 3:1
 }
-# y_c1_train = [np.zeros((y_c2_train[0].shape[0], num_c_1)) for i in range(len(y_train))]
-# y_c1_test = [np.zeros((y_c2_test[0].shape[0], num_c_1)) for i in range(len(y_test))]
+
 y_c1_train = []
 y_c1_test = []
 for i in range(len(y_train)):
@@ -608,39 +605,38 @@ for i in range(len(y_test)):
 
 def get_net_model(alpha, beta, gamma):
     img_input = Input(shape=input_shape, name='input')
-    # -----------------swim transformer-------------------------
-    # y = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
-    y_input = layers.RandomFlip("horizontal")(img_input)
+    # -----------------swin transformer-------------------------
+    img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
+    img_input = layers.RandomRotation(0.2)(img_input)
+    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input) 
     y_1 = PatchExtract(patch_size)(y_input)
     y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y_1)
-    print('y.shape:', y)  # (None, 784, 64)
+    print('y.shape:', y)  
     ST1 = SwinTransformer(
-        dim=embed_dim,  # ----------------
+        dim=embed_dim,  
         num_patch=(num_patch_x, num_patch_y),
-        num_heads=num_heads,  # -------------------
+        num_heads=num_heads, 
         window_size=window_size,
         shift_size=0,
-        num_mlp=num_mlp,  # -------------------
+        num_mlp=num_mlp, 
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(y)
     ST2 = SwinTransformer(
-        dim=embed_dim,  # ----------------------
+        dim=embed_dim, 
         num_patch=(num_patch_x, num_patch_y),
-        num_heads=num_heads,  # ----------------------
+        num_heads=num_heads,  
         window_size=window_size,
         shift_size=shift_size,
-        num_mlp=num_mlp,  # -------------------
+        num_mlp=num_mlp,  
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(ST1)
-    # ST2 = PatchMerging((num_patch_x, num_patch_y), embed_dim=embed_dim)(ST2)
-    # -----------------swim transformer-------------------------
+    # -----------------swin transformer-------------------------
 
     # --- block 1 ---
     y_1 = Reshape((56, 56, 3))(y_1)
     x = Conv2D(12, (3, 3), activation='relu', padding='same', name='block1_conv1')(y_1)
-    # print('x.shape:', x.shape)  # (None, 56, 56, 16)
     x = BatchNormalization()(x)
     x = Conv2D(24, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
     x = BatchNormalization()(x)
@@ -768,10 +764,8 @@ for i in range(len(x_train)):
                             validation_data=(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]])))
     # scores.append(model.evaluate(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]], verbose=0))
     prediction = model.predict(x_test[i])[2]
-    y_true = np.argmax(y_test[i], axis=1)  # ---orignal  y_test[0]
-    # y_true = np.argmax(y_test, axis=1)
-    # prediction = VI_resnet_model.predict(x_test[0])
-    prediction = np.argmax(prediction, axis=1)  # 取最大值的索引（0-15）作为预测标签
+    y_true = np.argmax(y_test[i], axis=1)  
+    prediction = np.argmax(prediction, axis=1) 
     accuracy = accuracy_score(y_true, prediction)
     precision = precision_score(y_true, prediction, average='macro')
     recall = recall_score(y_true, prediction, average='macro')
@@ -786,15 +780,6 @@ for i in range(len(x_train)):
     from sklearn.metrics import matthews_corrcoef
     mcc = matthews_corrcoef(y_true, prediction)
     mcc_total.append(mcc)
-    # print('MCC:', mcc)
-    def calculate_zl(y_true, y_pred):
-        zl_count = 0
-        for i in range(len(y_true)):
-            if y_true[i] == y_pred[i]:
-                zl_count += 1
-        return zl_count / len(y_true)
-    zl = calculate_zl(y_true, prediction)
-    zl_total.append(zl)
 
 f1_mean =0.0
 mcc_mean=0.0
@@ -804,7 +789,6 @@ for i,j,k in zip(f1_total,mcc_total,zl_total):
 f1_mean = f1_mean/10
 mcc_mean =mcc_mean/10
 print('f1_mean:',f1_mean)
-# print('zl_mean:',zl_mean/10)
 print('mcc_mean:',mcc_mean)
 with open('2014_2017_model_K.csv', mode='w', newline='') as output_file:
     writer = csv.writer(output_file)
