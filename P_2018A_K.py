@@ -612,23 +612,28 @@ for i in range(len(y_test)):
 
 def get_net_model(alpha, beta, gamma):
     img_input = Input(shape=input_shape, name='input')
-    # -----------------swim transformer-------------------------
-    img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
-    img_input = layers.RandomRotation(0.2)(img_input)
-    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input)  # 'horizontal_and_vertical'
-    y = PatchExtract(patch_size)(y)
-    y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y)
+    # img_input_ = layers.RandomCrop(image_dimension, image_dimension)(img_input)  
+    # img_input_ = layers.RandomRotation(0.2)(img_input_)
+    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input)
+    y_1 = PatchExtract(patch_size)(y_input)
+    y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y_1)
     ST1 = SwinTransformer(
-        dim=embed_dim,  # ----------------
+        dim=embed_dim, 
         num_patch=(num_patch_x, num_patch_y),
-        num_heads=num_heads,  # -------------------
+        num_heads=num_heads, 
         window_size=window_size,
         shift_size=0,
-        num_mlp=num_mlp,  # -------------------
+        num_mlp=num_mlp, 
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(y)
-    print('x.shape:', y)  
+    
+    ST1_mid = Reshape((28, 28, 64))(ST1)
+    ST1_mid = Conv2D(64, (1, 1), activation='relu', padding='same')(ST1_mid)
+    ST1_mid = Conv2D(64, (3, 3), activation='relu', padding='same')(ST1_mid)
+    ST1 = Reshape((784,64))(ST1_mid)
+#     ST1 = Add()([ST1, ST1_mid])   
+    
     ST2 = SwinTransformer(
         dim=embed_dim,  # ----------------------
         num_patch=(num_patch_x, num_patch_y),
@@ -639,97 +644,104 @@ def get_net_model(alpha, beta, gamma):
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(ST1)
-    # ST2 = PatchMerging((num_patch_x, num_patch_y), embed_dim=embed_dim)(ST2)
-    # print('x.shape:', ST2)  # (None, 196, 128)
-    # -----------------swin transformer-------------------------
-
     # --- block 1 ---
-    x = Conv2D(12, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
-    print('x.shape:', x.shape)  # (None, 56, 56, 16)
+    y_1 = Reshape((56, 56, 3))(y_1)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(y_1)
     x = BatchNormalization()(x)
-    x = Conv2D(24, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
     x = BatchNormalization()(x)
 
     # --- coarse 1 branch ---
     c_1_bch = Flatten(name='c1_flatten')(x)
-    c_1_bch = Dense(32, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
+    c_1_bch = Dense(68, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
     c_1_bch = BatchNormalization()(c_1_bch)
-    # c_1_bch = Dropout(0.2)(c_1_bch)
+    c_1_bch = Dropout(0.1)(c_1_bch)
     c_1_pred = Dense(num_c_1, activation='softmax', name='c1_p')(c_1_bch)
-    print('coarse 1.c_1_pred.shape:', c_1_pred.shape)  # coarse 1.c_1_pred.shape: (None, 2)
 
     # --- block 2 ---
-    x = Conv2D(28, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
-    x = BatchNormalization()(x)
-    x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
-    x = BatchNormalization()(x)
+    # x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+    ST2_temp = GlobalAveragePooling2D()(x)
+    ST2_temp = Dense(128, activation='relu')(ST2_temp)
+    ST2_temp = Dense(64, activation='sigmoid')(ST2_temp)
+    ST2_temp = Reshape((1, 1, 64))(ST2_temp)
+    ST2_temp = multiply([ST2_temp, x])
+    ST2_temp = Add()([x, ST2_temp])
+    ST2_temp = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_temp)
+    ST2_temp = BatchNormalization()(ST2_temp)
 
-    ST1 = Reshape((56, 56, 16))(ST1)
-    ST1_brunch = ST1
-    print('ST1.shape:', ST1)  # (None, 196, 128)
-    ST1 = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv3')(ST1)
+    ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
+                               strides=(1, 1),
+                               padding='same')(x)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)  
+    
+    ST2_left = Add()([ST2_left, ST2_temp])
+
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(3, 3), strides=(2, 2), padding='same', activation='relu')(ST2_left)
+    x = BatchNormalization()(ST2_left)
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
+    x = BatchNormalization()(x)
+    ST1_temp = Reshape((28, 28, 64))(ST1)
+    ST1 = Conv2D(128, (1, 1), activation='relu', padding='same')(ST1_temp)  
     ST1 = BatchNormalization()(ST1)
-
+    ST1 = Conv2D(128, (3, 3), activation='relu', padding='same')(ST1)  
+    ST1 = BatchNormalization()(ST1)
     # --- coarse 2 branch ---
     x_out = Add()([ST1, x])
     c_2_bch = Flatten(name='c2_flatten')(x_out)
-    c_2_bch = Dense(48, activation='relu', name='c2_fc_cifar10_1')(c_2_bch)
+    c_2_bch = Dense(128, activation='relu', name='c2_fc_cifar10_1')(c_2_bch)
     c_2_bch = BatchNormalization()(c_2_bch)
     c_2_bch = Dropout(0.2)(c_2_bch)
     c_2_pred = Dense(num_c_2, activation='softmax', name='c2_p')(c_2_bch)
-    print('coarse 2.c_2_pred.shape:', c_2_pred.shape)  # coarse 2.c_2_pred.shape: (None, 7)
 
     # --- block 3 ---
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x_out)
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block2_conv4')(x)
+    x = Conv2D(256, (1, 1), activation='relu', padding='same', name='block2_conv4')(x)
     x = BatchNormalization()(x)
-    print('block 3.x.shape:', x.shape)  # (28,28,64)
+    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block2_conv5')(x)
+    x = BatchNormalization()(x) 
 
     # --- block 4 ---
     # --- fine block ---
-
     ST2 = Reshape((28, 28, 64))(ST2)
+    ST2_temp = GlobalAveragePooling2D()(ST2)  
+    ST2_temp = Dense(128, activation='relu')(ST2_temp)
+    ST2_temp = Dense(64, activation='sigmoid')(ST2_temp)
+    ST2_temp = Reshape((1, 1, 64))(ST2_temp)
+    ST2_temp = multiply([ST2_temp, ST2])
+    ST2_temp = Add()([ST2, ST2_temp])
+    ST2_temp = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_temp)
+    ST2_temp = BatchNormalization()(ST2_temp) 
 
-    # # -------
-    # ST2 = Add()([ST1_brunch,ST2])
-    # # -------
-    # shuffleNet---------------------------------
     ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
                                strides=(1, 1),
                                padding='same')(ST2)
-    print('ST2_left:', ST2_left)
     ST2_left = BatchNormalization()(ST2_left)
-    ST2_left = Conv2D(filters=48, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
     ST2_left = BatchNormalization()(ST2_left)
-    # ST1_bap = GlobalAveragePooling2D()(ST1)
-    # # result_1 = tf.nn.l2_normalize(layer1_b3, axis=2)
-    # ST1_left = multiply([ST1_left, ST1_bap])
-    # print('ST2_after_multiply:',ST1_left)  # shape=(None, 56, 56, 8)
-    ST2_left = Conv2D(filters=32, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    
+    ST2_left = Add()([ST2_left, ST2_temp])  
 
-    ST2_right = Conv2D(filters=48, kernel_size=(1, 1), padding='same', activation='relu')(ST2)
-    ST2_right = BatchNormalization()(ST2_right)
-    ST2_right = DepthwiseConv2D(kernel_size=(3, 3),
-                                strides=(1, 1),
-                                padding='same')(ST2_right)
-    print('ST2_right:', ST2_right)  # shape=(None, 56, 56, 16)
-    ST2_right = BatchNormalization()(ST2_right)
-    ST2_right = Conv2D(filters=32, kernel_size=(1, 1), padding='same', activation='relu')(ST2_right)
-    ST2_right = BatchNormalization()(ST2_right)
-    ST2 = Add()([ST2_left, ST2_right])
-    ST2 = Conv2D(filters=64, kernel_size=(1, 1), padding='same', activation='relu')(ST2)
-    # shuffleNet---------------------------------
-
+    ST2_left = Conv2D(filters=256, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=256, kernel_size=(3, 3), strides=(2, 2), padding='same', activation='relu')(ST2_left)
+    ST2 = BatchNormalization()(ST2_left)
     ST2 = Add()([ST2, x])
-    print('fine block.x.shape:', ST2.shape)  # fine block.x.shape: (None, 56, 56, 32)
+    ST2 = Conv2D(256, kernel_size=(1, 1), activation='relu', padding='same')(ST2) 
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Conv2D(256, kernel_size=(3, 3), activation='relu', padding='same')(ST2) 
+    ST2 = BatchNormalization()(ST2)
     ST2 = Flatten(name='ST2_flatten')(ST2)
-    ST2 = Dense(128, activation='relu', name='fine_fc1')(ST2)
-    ST2 = Dropout(0.3)(ST2)
-    # ST2 = Dense(64, activation='relu', name='fine_fc2')(ST2)
-    # ST2 = Dropout(0.2)(ST2)
-    output = layers.Dense(units=NUM_CATEGORIES, activation='softmax', name="last_layer")(ST2)  # 模型的最后一层
-
-    # complete_model = tf.keras.Model(inputs=VI_model.input, outputs=output)
+    ST2 = Dense(512,activation='relu', name='fine_fc1')(ST2)
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Dropout(0.2)(ST2)
+    ST2 = Dense(512,activation='relu', name='fine_fc2')(ST2)
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Dropout(0.2)(ST2)
+    output = layers.Dense(units=num_classes, activation='softmax', name="last_layer")(ST2)  
     model = Model(inputs=img_input, outputs=[c_1_pred, c_2_pred, output], name='medium_dynamic')
     # model.summary()
     sgd = SGD(lr=0.003, momentum=0.9, nesterov=True)
@@ -758,7 +770,7 @@ mcc_total = []
 for i in range(len(x_train)):
     model = get_net_model(alpha, beta, gamma)
     history.append(model.fit(x_train[i], [y_c1_train[i], y_c2_train[i], y_train[i]],
-                            batch_size=128,  # 128
+                            batch_size=16,  # 128 is also okay
                             epochs=epochs,
                             verbose=1,
                             callbacks=cbks,
@@ -781,24 +793,12 @@ for i in range(len(x_train)):
     mcc = matthews_corrcoef(y_true, prediction)
     mcc_total.append(mcc)
     # print('MCC:', mcc)
-    def calculate_zl(y_true, y_pred):
-        zl_count = 0
-        for i in range(len(y_true)):
-            if y_true[i] == y_pred[i]:
-                zl_count += 1
-        return zl_count / len(y_true)
-    zl = calculate_zl(y_true, prediction)
-    zl_total.append(zl)
-    # print('zl:', zl)
 
 f1_mean =0.0
 mcc_mean=0.0
-zl_mean=0.0
-for i,j,k in zip(f1_total,mcc_total,zl_total):
+for i,j,k in zip(f1_total,mcc_total):
     f1_mean = f1_mean + float(i)
     mcc_mean = mcc_mean + float(j)
-    zl_mean = zl_mean + float(k)
 print('f1_mean:',f1_mean/10)
 print('zl_mean:',zl_mean/10)
-print('mcc_mean:',mcc_mean/10)
 
