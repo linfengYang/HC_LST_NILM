@@ -3,25 +3,18 @@ import tensorflow as tf
 import numpy as np
 from sklearn.metrics import accuracy_score
 import os
-# from keras.datasets import cifar10
 from keras.models import Model
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D, Input,Reshape,Add
 from keras.layers import Dense, Flatten, Dropout,DepthwiseConv2D, Layer, GlobalAveragePooling1D, Input, RandomCrop, RandomFlip, Embedding,LayerNormalization,Activation
-# from keras.initializers import he_normal
 from keras import optimizers
 from keras.callbacks import LearningRateScheduler, TensorBoard
-# from tensorflow.keras.layers.normalization import BatchNormalization
-# from tensorflow.keras.layers.normalization.batch_normalization_v1 import BatchNormalization
-# from tensorflow.keras.layers import normalization
 from keras.layers import BatchNormalization
-# from tensorflow.keras.utils.data_utils import get_file
 from keras.utils import get_file
 from keras import backend as K
 from scipy.io import loadmat
 import seaborn as sn
 import pandas as pd
-# import tensorflow as tf
 from keras import layers, models
 from keras.losses import categorical_crossentropy
 from sklearn import preprocessing
@@ -36,7 +29,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 import cv2
 import numpy as np
 import os
-from keras.utils import to_categorical # np_utils
+from keras.utils import to_categorical 
 from sklearn.model_selection import train_test_split
 from keras.optimizers import SGD
 from sklearn.metrics import precision_recall_fscore_support
@@ -46,13 +39,13 @@ import numpy as np
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow import keras
-# from keras.activations import softmax
+
 EPOCHS = 60 # 100  # ---
 EPOCHS_LENET = 10
 IMG_WIDTH = 56 # 128
 IMG_HEIGHT = 56 # 128
 NUM_CATEGORIES = 11
-INPUT_IMAGE_DIR = "images/VI_images_test/2017Sub_one/" 
+INPUT_IMAGE_DIR = "images/VI_images_test/2017Sub_one/"  # ----
 INPUT_MODEL_DIR = "models"
 OUTPUT_MODEL_DIR = "models"
 SAVE_DIR = "images"
@@ -85,10 +78,10 @@ model_path = os.path.join(weights_store_filepath, model_name)
 
 def scheduler(epoch):
   learning_rate_init = 0.003
-  if epoch > 50:
-    learning_rate_init = 0.001  # 0.0015   
-  if epoch > 70:
-    learning_rate_init = 0.0008  # 0.0001  
+  if epoch > 40:
+    learning_rate_init = 0.0018  
+  if epoch > 55:
+    learning_rate_init = 0.0006 
   return learning_rate_init
 
 class LossWeightsModifier(tf.keras.callbacks.Callback):
@@ -120,19 +113,6 @@ def import_model():
     model.summary()
     return model
 def load_data(data_dir):
-    """
-    Load image data from directory `data_dir`.
-
-    Assume `data_dir` has one directory named after each category.\
-    Inside each category directory will be some number of image files.
-
-    Return tuple `(images, labels)`. `images` should be a list of all
-    of the images in the data directory, where each image is formatted as a
-    numpy ndarray with dimensions IMG_WIDTH x IMG_HEIGHT x 1. `labels` should
-    be a list of strings (ex: 'Laptop', 'Blender', ...), \
-    representing the categories for each of the
-    corresponding `images/loads`.
-    """
     images = []
     labels = []
     labels_literal = []
@@ -181,7 +161,7 @@ def process_data_VI_Images(k_folds=True):
     X = X/255 
     print('X[0]-----after:', X[0])
     Y = np.array(labels)
-    skf = StratifiedKFold(n_splits=10, shuffle=True)  # -------------------------------------
+    skf = StratifiedKFold(n_splits=10, shuffle=True)  
     # k = 10
     # skf = KFold(k)
     i = 0
@@ -559,7 +539,6 @@ class PatchMerging(tf.keras.layers.Layer):
 x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=True) 
 
 #---------------------- make coarse 2 labels --------------------------
-
 parent_f = {
   0:3, 2:3, 5:3, 6:3, 9:3,
   4:2, 8:2,
@@ -599,15 +578,13 @@ for i in range(len(y_test)):
 
 def get_net_model(alpha, beta, gamma):
     img_input = Input(shape=input_shape, name='input')
-    # -----------------swin transformer-------------------------
-    img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input) 
-    img_input = layers.RandomRotation(0.2)(img_input)
-    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input) 
+    # img_input_ = layers.RandomCrop(image_dimension, image_dimension)(img_input)  
+    # img_input_ = layers.RandomRotation(0.2)(img_input_)
+    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input)
     y_1 = PatchExtract(patch_size)(y_input)
     y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y_1)
-    print('y.shape:', y)  
     ST1 = SwinTransformer(
-        dim=embed_dim,  
+        dim=embed_dim, 
         num_patch=(num_patch_x, num_patch_y),
         num_heads=num_heads, 
         window_size=window_size,
@@ -616,94 +593,123 @@ def get_net_model(alpha, beta, gamma):
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(y)
+    
+    ST1_mid = Reshape((28, 28, 64))(ST1)
+    ST1_mid = Conv2D(64, (1, 1), activation='relu', padding='same')(ST1_mid)
+    ST1_mid = Conv2D(64, (3, 3), activation='relu', padding='same')(ST1_mid)
+    ST1 = Reshape((784,64))(ST1_mid)
+#     ST1 = Add()([ST1, ST1_mid])   
+    
     ST2 = SwinTransformer(
-        dim=embed_dim, 
+        dim=embed_dim,  # ----------------------
         num_patch=(num_patch_x, num_patch_y),
-        num_heads=num_heads,  
+        num_heads=num_heads,  # ----------------------
         window_size=window_size,
         shift_size=shift_size,
-        num_mlp=num_mlp,  
+        num_mlp=num_mlp,  # -------------------
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(ST1)
-    # -----------------swin transformer-------------------------
-
     # --- block 1 ---
     y_1 = Reshape((56, 56, 3))(y_1)
-    x = Conv2D(12, (3, 3), activation='relu', padding='same', name='block1_conv1')(y_1)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(y_1)
     x = BatchNormalization()(x)
-    x = Conv2D(24, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
     x = BatchNormalization()(x)
 
     # --- coarse 1 branch ---
     c_1_bch = Flatten(name='c1_flatten')(x)
-    c_1_bch = Dense(32, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
+    c_1_bch = Dense(68, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
     c_1_bch = BatchNormalization()(c_1_bch)
+    c_1_bch = Dropout(0.1)(c_1_bch)
     c_1_pred = Dense(num_c_1, activation='softmax', name='c1_p')(c_1_bch)
 
     # --- block 2 ---
-    x = Conv2D(28, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
-    x = BatchNormalization()(x)
-    x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
-    x = BatchNormalization()(x)
+    # x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+    ST2_temp = GlobalAveragePooling2D()(x)
+    ST2_temp = Dense(128, activation='relu')(ST2_temp)
+    ST2_temp = Dense(64, activation='sigmoid')(ST2_temp)
+    ST2_temp = Reshape((1, 1, 64))(ST2_temp)
+    ST2_temp = multiply([ST2_temp, x])
+    ST2_temp = Add()([x, ST2_temp])
+    ST2_temp = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_temp)
+    ST2_temp = BatchNormalization()(ST2_temp)
 
-    ST1 = Reshape((56, 56, 16))(ST1)
-    ST1_brunch = ST1
-    ST1 = Conv2D(32, (3, 3), activation='relu', padding='same', name='block2_conv3')(ST1)
+    ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
+                               strides=(1, 1),
+                               padding='same')(x)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)  
+    
+    ST2_left = Add()([ST2_left, ST2_temp])
+
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(3, 3), strides=(2, 2), padding='same', activation='relu')(ST2_left)
+    x = BatchNormalization()(ST2_left)
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
+    x = BatchNormalization()(x)
+    ST1_temp = Reshape((28, 28, 64))(ST1)
+    ST1 = Conv2D(128, (1, 1), activation='relu', padding='same')(ST1_temp)  
     ST1 = BatchNormalization()(ST1)
-
+    ST1 = Conv2D(128, (3, 3), activation='relu', padding='same')(ST1)  
+    ST1 = BatchNormalization()(ST1)
     # --- coarse 2 branch ---
     x_out = Add()([ST1, x])
     c_2_bch = Flatten(name='c2_flatten')(x_out)
-    c_2_bch = Dense(48, activation='relu', name='c2_fc_cifar10_1')(c_2_bch)
+    c_2_bch = Dense(128, activation='relu', name='c2_fc_cifar10_1')(c_2_bch)
     c_2_bch = BatchNormalization()(c_2_bch)
     c_2_bch = Dropout(0.2)(c_2_bch)
     c_2_pred = Dense(num_c_2, activation='softmax', name='c2_p')(c_2_bch)
 
     # --- block 3 ---
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x_out)
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block2_conv4')(x)
+    x = Conv2D(256, (1, 1), activation='relu', padding='same', name='block2_conv4')(x)
     x = BatchNormalization()(x)
+    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block2_conv5')(x)
+    x = BatchNormalization()(x) 
 
     # --- block 4 ---
     # --- fine block ---
-
     ST2 = Reshape((28, 28, 64))(ST2)
+    ST2_temp = GlobalAveragePooling2D()(ST2)  
+    ST2_temp = Dense(128, activation='relu')(ST2_temp)
+    ST2_temp = Dense(64, activation='sigmoid')(ST2_temp)
+    ST2_temp = Reshape((1, 1, 64))(ST2_temp)
+    ST2_temp = multiply([ST2_temp, ST2])
+    ST2_temp = Add()([ST2, ST2_temp])
+    ST2_temp = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_temp)
+    ST2_temp = BatchNormalization()(ST2_temp) 
 
-    # shuffleNet---------------------------------
     ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
                                strides=(1, 1),
                                padding='same')(ST2)
-    # print('ST2_left:', ST2_left)
     ST2_left = BatchNormalization()(ST2_left)
-    ST2_left = Conv2D(filters=48, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
     ST2_left = BatchNormalization()(ST2_left)
-    # ST1_bap = GlobalAveragePooling2D()(ST1)
-    # # result_1 = tf.nn.l2_normalize(layer1_b3, axis=2)
-    # ST1_left = multiply([ST1_left, ST1_bap])
-    # print('ST2_after_multiply:',ST1_left)  # shape=(None, 56, 56, 8)
-    ST2_left = Conv2D(filters=32, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    
+    ST2_left = Add()([ST2_left, ST2_temp])  
 
-    ST2_right = Conv2D(filters=48, kernel_size=(1, 1), padding='same', activation='relu')(ST2)
-    ST2_right = BatchNormalization()(ST2_right)
-    ST2_right = DepthwiseConv2D(kernel_size=(3, 3),
-                                strides=(1, 1),
-                                padding='same')(ST2_right)
-    # print('ST2_right:', ST2_right)  # shape=(None, 56, 56, 16)
-    ST2_right = BatchNormalization()(ST2_right)
-    ST2_right = Conv2D(filters=32, kernel_size=(1, 1), padding='same', activation='relu')(ST2_right)
-    ST2_right = BatchNormalization()(ST2_right)
-    ST2 = Add()([ST2_left, ST2_right])
-    ST2 = Conv2D(filters=64, kernel_size=(1, 1), padding='same', activation='relu')(ST2)
-    # shuffleNet---------------------------------
-
+    ST2_left = Conv2D(filters=256, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=256, kernel_size=(3, 3), strides=(2, 2), padding='same', activation='relu')(ST2_left)
+    ST2 = BatchNormalization()(ST2_left)
     ST2 = Add()([ST2, x])
+    ST2 = Conv2D(256, kernel_size=(1, 1), activation='relu', padding='same')(ST2) 
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Conv2D(256, kernel_size=(3, 3), activation='relu', padding='same')(ST2) 
+    ST2 = BatchNormalization()(ST2)
     ST2 = Flatten(name='ST2_flatten')(ST2)
-    ST2 = Dense(128, activation='relu', name='fine_fc1')(ST2)
-    ST2 = Dropout(0.3)(ST2)
-    output = layers.Dense(units=NUM_CATEGORIES, activation='softmax', name="last_layer")(ST2) 
-
+    ST2 = Dense(512,activation='relu', name='fine_fc1')(ST2)
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Dropout(0.2)(ST2)
+    ST2 = Dense(512,activation='relu', name='fine_fc2')(ST2)
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Dropout(0.2)(ST2)
+    output = layers.Dense(units=num_classes, activation='softmax', name="last_layer")(ST2)  
     model = Model(inputs=img_input, outputs=[c_1_pred, c_2_pred, output], name='medium_dynamic')
+    # model.summary()
     sgd = SGD(lr=0.003, momentum=0.9, nesterov=True)
     model.compile(loss='categorical_crossentropy',
                   optimizer=sgd,
@@ -769,27 +775,3 @@ with open('2014_2017_model_K.csv', mode='w', newline='') as output_file:
     writer = csv.writer(output_file)
     writer.writerow(['F1_mean', 'mcc_mean'])
     writer.writerow([f1_mean, mcc_mean])
-def plot_training_results(model, history, epochs, filename):
-    plt.figure(figsize=(16, 8))
-    subtitles = ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)', '(g)', '(h)', '(i)', '(j)', '(k)', '(l)']
-    j = 1
-    acc = []
-    loss = []
-    for i in range(len(history)):
-        acc.append(history[i].history['acc'])
-        loss.append(history[i].history['loss'])
-        epochs_range = range(epochs)
-        plt.subplot(len(history), 2, j)
-        plt.title(subtitles[j - 1], fontsize=10, pad=10)
-        plt.plot(epochs_range, acc[i], label=f'Training Accuracy {i + 1}')
-        plt.legend(loc='lower right')
-        j += 1
-        plt.subplot(len(history), 2, j)
-        plt.title(subtitles[j - 1], fontsize=10, pad=10)
-        plt.plot(epochs_range, loss[i], label=f'Training Loss {i + 1}')
-        plt.legend(loc='upper right')
-        j += 1
-    plt.tight_layout()
-    if not os.path.exists(f"{OUTPUT_MODEL_DIR}/training_history"):
-        os.makedirs(f"{OUTPUT_MODEL_DIR}/training_history/")
-    plt.savefig(f"{OUTPUT_MODEL_DIR}/training_history/{filename}.png", dpi=128)
