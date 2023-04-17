@@ -12,10 +12,11 @@ Whitedv1.1 : https://www.cs.cit.tum.de/msrg/resources/
 Our study requires TensorFlow 2.5 or higher, as well as TensorFlow Addons.
 
 Then you can generate the VI trajectories (with the appliance name as the foldname), the save path is as follows:
-images
 
-  VI_images_test
+images
   
+  VI_images_test
+    
     2017Sub_one
     
     2014Sub_one
