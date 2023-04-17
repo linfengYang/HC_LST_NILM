@@ -1,8 +1,12 @@
 # English 
 # preparing PLAID and Whited dataset 
+
 PLAID 2018 : https://figshare.com/articles/dataset/PLAID_-_A_Voltage_and_Current_Measurement_Dataset_for_Plug_Load_Appliance_Identification_in_Households/10084619
+
 PLAID 2017: https://figshare.com/articles/dataset/PLAID_2017/11605215
+
 PLAID 2014 : https://figshare.com/articles/dataset/PLAID_2014/11605074
+
 Whitedv1.1 : https://www.cs.cit.tum.de/msrg/resources/
 
 Our study requires TensorFlow 2.5 or higher, as well as TensorFlow Addons.
@@ -43,15 +47,9 @@ Contact e-mail:
 
 验证对VI轨迹做的预处理在不同的评估方法上（K折，8：2）得到的结果会有差异，主要表现在：K折缩小了差距（因为9折训练，1折测试）
 
-这个VI轨迹其实有个问题，就是样本数太少，我也看过一些研究采用一个CSV画多个VI轨迹图，但根据我实验发现，这会使得整体指标都往上提高不少，因此个人不推荐使用此方法。
+这个VI轨迹其实有个问题，就是样本数太少，我也看过一些研究采用一个CSV画多个VI轨迹图，但根据我实验发现，这会使得整体指标都往上提高不少（也很容易解释，一个CSV画出来好几个长得很容易区分的VI轨迹，虽然增大了数据量，但“不公平”），因此个人不推荐使用此方法。
 所以对于VI轨迹图数量较少，模型会更容易过拟合，因此本文注释处原本采取了三个数据增强方法（Flip,Crop,Rotation）,但训练的epoch会增大几倍（大概需要180轮），得到的结果确是相近的。因此本文最终只采用RandomFlip，根据论文中画出的acc曲线可以看出，存在过拟合的趋势，但是性价比很高。
 
-总而言之，论文尚有诸多小问题尚待优化，欢迎批评指正
+总而言之，论文尚有诸多小问题尚待优化，欢迎批评指正。
 Contact e-mail:
 2113301058@st.gxu.edu.cn
-
-
-
-
-
-
