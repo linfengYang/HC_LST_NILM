@@ -737,8 +737,11 @@ for i in range(len(x_train)):
                             callbacks=cbks,
                             validation_data=(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]])))
     # scores.append(model.evaluate(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]], verbose=0))
-    # A problem has occured when I try to save the best model to conduct the predict, hence the final results are lower than theory(this can be seen by observing the last layer accuracy fluctuating in training). 
-    # Our paper use the mean value of 3 experiment results as the final results.
+    '''
+    A problem has occured when I try to save the best model to conduct the predict, 
+    hence the final results are lower than theory(this can be seen by observing the last layer accuracy fluctuating in training). 
+    Our paper use the mean value of 3 experiment results as the final results.
+    '''
     prediction = model.predict(x_test[i])[2]
     y_true = np.argmax(y_test[i], axis=1)  
     prediction = np.argmax(prediction, axis=1) 
