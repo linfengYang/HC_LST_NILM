@@ -10,6 +10,10 @@ PLAID 2014 : https://figshare.com/articles/dataset/PLAID_2014/11605074
 Whitedv1.1 : https://www.cs.cit.tum.de/msrg/resources/
 
 Our study requires TensorFlow 2.5 or higher, as well as TensorFlow Addons.
+Our enivornment (for reference only)：
+tensorflow 2.6.0
+keras 2.6.0
+numpy 1.23.1
 
 Then you can generate the VI trajectories (with the appliance name as the foldname), the save path is as follows:
 
