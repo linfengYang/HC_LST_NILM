@@ -102,7 +102,7 @@ class LossWeightsModifier(tf.keras.callbacks.Callback):
       K.set_value(self.beta, 0)
       K.set_value(self.gamma, 1)
 def import_model():
-    print('请输入训练好的的模型进行测试：')
+    print('input model：')
     filename = input("\nModel name: ")
     model = tf.keras.models.load_model(f"{INPUT_MODEL_DIR}/{filename}")  # {filename}.h5")
     model.summary()
@@ -659,146 +659,153 @@ Resnet_model = tf.keras.models.Sequential(Resnet_model.layers[:-1])
 for layer in Resnet_model.layers:
     layer.trainable = False
 
-img_input = Input(shape=input_shape, name='input')
+def get_net_model(alpha, beta, gamma):
+    img_input = Input(shape=input_shape, name='input')
+    # img_input_ = layers.RandomCrop(image_dimension, image_dimension)(img_input)  
+    # img_input_ = layers.RandomRotation(0.2)(img_input_)
+    y_input = layers.RandomFlip("horizontal_and_vertical")(img_input)
+    y_1 = PatchExtract(patch_size)(y_input)
+    y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y_1)
+    ST1 = SwinTransformer(
+        dim=embed_dim, 
+        num_patch=(num_patch_x, num_patch_y),
+        num_heads=num_heads, 
+        window_size=window_size,
+        shift_size=0,
+        num_mlp=num_mlp, 
+        qkv_bias=qkv_bias,
+        dropout_rate=dropout_rate,
+    )(y)
+    
+    ST1_mid = Reshape((28, 28, 64))(ST1)
+    ST1_mid = Conv2D(64, (1, 1), activation='relu', padding='same')(ST1_mid)
+    ST1_mid = Conv2D(64, (3, 3), activation='relu', padding='same')(ST1_mid)
+    ST1 = Reshape((784,64))(ST1_mid)
+#     ST1 = Add()([ST1, ST1_mid])   
+    
+    ST2 = SwinTransformer(
+        dim=embed_dim,  # ----------------------
+        num_patch=(num_patch_x, num_patch_y),
+        num_heads=num_heads,  # ----------------------
+        window_size=window_size,
+        shift_size=shift_size,
+        num_mlp=num_mlp,  # -------------------
+        qkv_bias=qkv_bias,
+        dropout_rate=dropout_rate,
+    )(ST1)
+    # --- block 1 ---
+    y_1 = Reshape((56, 56, 3))(y_1)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(y_1)
+    x = BatchNormalization()(x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
+    x = BatchNormalization()(x)
 
-# -----------------swin transformer-------------------------
-img_input = layers.RandomCrop(image_dimension, image_dimension)(img_input)  # image_dimension = 56
-img_input = layers.RandomRotation(0.2)(img_input)
-y_input = layers.RandomFlip("horizontal_and_vertical")(img_input) 
-y = PatchExtract(patch_size)(y_input)
-print('x.shape:',y) # (None, 256, 12)
-y = PatchEmbedding(num_patch_x * num_patch_y, embed_dim)(y)
-print('x.shape:',y) # (None, 784, 64)
-ST1 = SwinTransformer(
-    dim=embed_dim,
-    num_patch=(num_patch_x, num_patch_y),
-    num_heads=num_heads,
-    window_size=window_size,
-    shift_size=0,
-    num_mlp=num_mlp,
-    qkv_bias=qkv_bias,
-    dropout_rate=dropout_rate,
-)(y)
-print('x.shape:',y) # (None, 784, 64)
-ST2 = SwinTransformer(
-    dim=embed_dim,
-    num_patch=(num_patch_x, num_patch_y),
-    num_heads=num_heads,
-    window_size=window_size,
-    shift_size=shift_size,
-    num_mlp=num_mlp,
-    qkv_bias=qkv_bias,
-    dropout_rate=dropout_rate,
-)(ST1)
-print('x.shape:',ST2) # (None, 784, 64)
-ST2 = PatchMerging((num_patch_x, num_patch_y), embed_dim=embed_dim)(ST2)
-print('x.shape:',ST2) # (None, 196, 128)
-y = layers.GlobalAveragePooling1D()(ST2)
-print('x.shape:',y) # (None, 128)
-# -----------------swim transformer-------------------------
+    # --- coarse 1 branch ---
+    c_1_bch = Flatten(name='c1_flatten')(x)
+    c_1_bch = Dense(68, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
+    c_1_bch = BatchNormalization()(c_1_bch)
+    c_1_bch = Dropout(0.1)(c_1_bch)
+    c_1_pred = Dense(num_c_1, activation='softmax', name='c1_p')(c_1_bch)
 
-# --- block 1 ---
-x = Conv2D(8, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
-print('x.shape:',x.shape)  # (None, 56, 56, 16)
-x = BatchNormalization()(x)
-# x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
-# x = BatchNormalization()(x)
-# x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+    # --- block 2 ---
+    # x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+    ST2_temp = GlobalAveragePooling2D()(x)
+    ST2_temp = Dense(128, activation='relu')(ST2_temp)
+    ST2_temp = Dense(64, activation='sigmoid')(ST2_temp)
+    ST2_temp = Reshape((1, 1, 64))(ST2_temp)
+    ST2_temp = multiply([ST2_temp, x])
+    ST2_temp = Add()([x, ST2_temp])
+    ST2_temp = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_temp)
+    ST2_temp = BatchNormalization()(ST2_temp)
 
-# --- block 2 ---
-x = Conv2D(16, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
-x = BatchNormalization()(x)
-# x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
-# x = BatchNormalization()(x)
-# x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
-print('block 2.x.shape:', x.shape)  # block 2.x.shape: (None, 8, 8, 128)
+    ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
+                               strides=(1, 1),
+                               padding='same')(x)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)  
+    
+    ST2_left = Add()([ST2_left, ST2_temp])
 
-# --- coarse 1 branch ---
-c_1_bch = Flatten(name='c1_flatten')(x)
-c_1_bch = Dense(32, activation='relu', name='c1_fc_cifar10_1')(c_1_bch)
-c_1_bch = BatchNormalization()(c_1_bch)
-c_1_bch = Dropout(0.4)(c_1_bch)
-c_1_bch = Dense(32, activation='relu', name='c1_fc2')(c_1_bch)
-c_1_bch = BatchNormalization()(c_1_bch)
-c_1_bch = Dropout(0.4)(c_1_bch)
-c_1_pred = Dense(num_c_1, activation='softmax', name='c1_p')(c_1_bch)
-print('coarse 1.c_1_pred.shape:', c_1_pred.shape)  # coarse 1.c_1_pred.shape: (None, 2)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(3, 3), strides=(2, 2), padding='same', activation='relu')(ST2_left)
+    x = BatchNormalization()(ST2_left)
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
+    x = BatchNormalization()(x)
+    ST1_temp = Reshape((28, 28, 64))(ST1)
+    ST1 = Conv2D(128, (1, 1), activation='relu', padding='same')(ST1_temp)  
+    ST1 = BatchNormalization()(ST1)
+    ST1 = Conv2D(128, (3, 3), activation='relu', padding='same')(ST1)  
+    ST1 = BatchNormalization()(ST1)
+    # --- coarse 2 branch ---
+    x_out = Add()([ST1, x])
+    c_2_bch = Flatten(name='c2_flatten')(x_out)
+    c_2_bch = Dense(128, activation='relu', name='c2_fc_cifar10_1')(c_2_bch)
+    c_2_bch = BatchNormalization()(c_2_bch)
+    c_2_bch = Dropout(0.2)(c_2_bch)
+    c_2_pred = Dense(num_c_2, activation='softmax', name='c2_p')(c_2_bch)
 
-# --- block 3 ---
-x = Conv2D(16, (3, 3), activation='relu', padding='same', name='block3_conv1')(x)
-# x = BatchNormalization()(x)
-x = Conv2D(28, (3, 3), activation='relu', padding='same', name='block3_conv2')(x)
-# x = BatchNormalization()(x)
-x = Conv2D(8, (3, 3), activation='relu', padding='same', name='block3_conv3')(x)
-# x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
-print('block 3.x.shape:', x.shape)  # block 3.x.shape: (None, 4, 4, 256)
+    # --- block 3 ---
+    x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x_out)
+    x = Conv2D(256, (1, 1), activation='relu', padding='same', name='block2_conv4')(x)
+    x = BatchNormalization()(x)
+    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block2_conv5')(x)
+    x = BatchNormalization()(x) 
 
-# --- coarse 2 branch ---
-ST1 = PatchMerging((num_patch_x, num_patch_y), embed_dim=embed_dim)(ST1)
-print('ST1.shape:',ST1) # (None, 196, 128)
-ST1 = Reshape((56,56,8))(ST1)
-print('ST1.shape:',ST1) # (None, 196, 128)
-x_out = Add()([ST1, x])
-# y = layers.GlobalAveragePooling1D()(ST1)
-c_2_bch = Flatten(name='c2_flatten')(x_out)
-c_2_bch = Dense(48, activation='relu', name='c2_fc_cifar10_1')(c_2_bch)
-c_2_bch = BatchNormalization()(c_2_bch)
-c_2_bch = Dropout(0.3)(c_2_bch)
-c_2_bch = Dense(32, activation='relu', name='c2_fc2')(c_2_bch)
-c_2_bch = BatchNormalization()(c_2_bch)
-c_2_bch = Dropout(0.2)(c_2_bch)
-c_2_pred = Dense(num_c_2, activation='softmax', name='c2_p')(c_2_bch)
-print('coarse 2.c_2_pred.shape:', c_2_pred.shape)  # coarse 2.c_2_pred.shape: (None, 7)
+    # --- block 4 ---
+    # --- fine block ---
+    ST2 = Reshape((28, 28, 64))(ST2)
+    ST2_temp = GlobalAveragePooling2D()(ST2)  
+    ST2_temp = Dense(128, activation='relu')(ST2_temp)
+    ST2_temp = Dense(64, activation='sigmoid')(ST2_temp)
+    ST2_temp = Reshape((1, 1, 64))(ST2_temp)
+    ST2_temp = multiply([ST2_temp, ST2])
+    ST2_temp = Add()([ST2, ST2_temp])
+    ST2_temp = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_temp)
+    ST2_temp = BatchNormalization()(ST2_temp) 
 
-# --- block 4 ---
-x = Conv2D(16, (3, 3), activation='relu', padding='same', name='block4_conv1')(x_out)
-# x = BatchNormalization()(x)
-x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block4_conv2')(x)
-# x = BatchNormalization()(x)
-# x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2')(x)
-# x = BatchNormalization()(x)
-# x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
-print('block 4.x.shape:', x.shape)  # block 4.x.shape: (None, 2, 2, 512)
+    ST2_left = DepthwiseConv2D(kernel_size=(3, 3),
+                               strides=(1, 1),
+                               padding='same')(ST2)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=128, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    
+    ST2_left = Add()([ST2_left, ST2_temp])  
 
-# --- fine block ---
-x = layers.MaxPool2D(pool_size=(2, 2), padding='valid', name='Pooling_1')(x)
-x = layers.Conv2D(filters=16, kernel_size=(1, 1), padding='valid', activation='relu')(x)
-x = layers.ZeroPadding2D((1, 1))(x)
-x = layers.Conv2D(filters=3, kernel_size=(1, 1), padding='valid', activation='relu')(x)
-x = layers.ZeroPadding2D((1, 1))(x)
-print('block 4.x.shape-------:', x.shape)
-
-print('ST2.shape:',ST2) # (None, 196, 128)
-ST2 = Reshape((56,56,8))(ST2)
-ST2 = Conv2D(16, (3, 3), activation='relu', padding='same', name='f_conv1')(ST2)
-ST2 = Reshape((32, 32, 49))(ST2)
-ST2 = Conv2D(3, (3, 3), activation='relu', padding='same', name='f_conv2')(ST2)
-ST2 = Add()([ST2, x])
-# x = Conv2D(3, (3, 3), activation='relu', padding='same', name='fine_block')(x)
-# x = BatchNormalization()(x)
-print('fine block.x.shape:', ST2.shape)  # fine block.x.shape: (None, 56,56,3)
-VI_model = tf.keras.Model(inputs=img_input, outputs=ST2, name="ResNet Extension")
-output_vi = VI_model.layers[-1].output  # 输出最后一层  # 满足（32，32，3）即可
-print("output_vi.shape:", output_vi.shape)
-print("VI_model.layers[-2].output.shape:", VI_model.layers[-2].output.shape)
-output = Resnet_model(inputs=output_vi)  # 前面模型的最后一层的输出作为另一个模型的输入
-output = layers.Dense(units=NUM_CATEGORIES, activation='softmax', name="last_layer")(output)  # 模型的最后一层
-# complete_model = tf.keras.Model(inputs=VI_model.input, outputs=output)
-model = Model(inputs=VI_model.input, outputs=[c_1_pred, c_2_pred, output], name='medium_dynamic')
-model.summary()
+    ST2_left = Conv2D(filters=256, kernel_size=(1, 1), padding='same', activation='relu')(ST2_left)
+    ST2_left = BatchNormalization()(ST2_left)
+    ST2_left = Conv2D(filters=256, kernel_size=(3, 3), strides=(2, 2), padding='same', activation='relu')(ST2_left)
+    ST2 = BatchNormalization()(ST2_left)
+    ST2 = Add()([ST2, x])
+    ST2 = Conv2D(256, kernel_size=(1, 1), activation='relu', padding='same')(ST2) 
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Conv2D(256, kernel_size=(3, 3), activation='relu', padding='same')(ST2) 
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Flatten(name='ST2_flatten')(ST2)
+    ST2 = Dense(512,activation='relu', name='fine_fc1')(ST2)
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Dropout(0.2)(ST2)
+    ST2 = Dense(512,activation='relu', name='fine_fc2')(ST2)
+    ST2 = BatchNormalization()(ST2)
+    ST2 = Dropout(0.2)(ST2)
+    output = layers.Dense(units=num_classes, activation='softmax', name="last_layer")(ST2)  
+    model = Model(inputs=img_input, outputs=[c_1_pred, c_2_pred, output], name='medium_dynamic')
+    # model.summary()
+    sgd = SGD(lr=0.003, momentum=0.9, nesterov=True)
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=sgd,
+                  loss_weights=[alpha, beta, gamma],
+                  # optimizer=keras.optimizers.Adadelta(),
+                  metrics=['acc'])
+    return model
 #----------------------- model definition ---------------------------
-alpha = K.variable(value=0.98, dtype="float32", name="alpha") # A1 in paper
-beta = K.variable(value=0.01, dtype="float32", name="beta") # A2 in paper
-gamma = K.variable(value=0.01, dtype="float32", name="gamma") # A3 in paper
+alpha = K.variable(value=0.98, dtype="float32", name="alpha") 
+beta = K.variable(value=0.01, dtype="float32", name="beta")
+gamma = K.variable(value=0.01, dtype="float32", name="gamma") 
 
 #----------------------- compile and fit ---------------------------
-sgd = SGD(lr=0.003, momentum=0.9, nesterov=True)
-model.compile(loss='categorical_crossentropy', 
-              optimizer=sgd, 
-              loss_weights=[alpha, beta, gamma],
-              # optimizer=keras.optimizers.Adadelta(),
-              metrics=['acc'])
-
 tb_cb = TensorBoard(log_dir=log_filepath, histogram_freq=0)
 change_lr = LearningRateScheduler(scheduler)
 change_lw = LossWeightsModifier(alpha, beta, gamma)
@@ -807,19 +814,19 @@ history = []
 scores = []
 f1_total = []
 accuracy_total = []
+mcc_total = []
 for i in range(len(x_train)):
+    model = get_net_model(alpha, beta, gamma)
     history.append(model.fit(x_train[i], [y_c1_train[i], y_c2_train[i], y_train[i]],
-                            batch_size=64,  # 128
+                            batch_size=16,  # 64
                             epochs=epochs,
                             verbose=1,
                             callbacks=cbks,
                             validation_data=(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]])))
     scores.append(model.evaluate(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]], verbose=0))
     prediction = model.predict(x_test[i])[2]
-    y_true = np.argmax(y_test[i], axis=1)  # ---orignal  y_test[0]
-    # y_true = np.argmax(y_test, axis=1)
-    # prediction = VI_resnet_model.predict(x_test[0])
-    prediction = np.argmax(prediction, axis=1)  # 取最大值的索引（0-15）作为预测标签
+    y_true = np.argmax(y_test[i], axis=1) 
+    prediction = np.argmax(prediction, axis=1)  
     accuracy = accuracy_score(y_true, prediction)
     precision = precision_score(y_true, prediction, average='macro')
     recall = recall_score(y_true, prediction, average='macro')
@@ -856,193 +863,4 @@ def plot_training_results(model, history, epochs, filename):
     if not os.path.exists(f"{OUTPUT_MODEL_DIR}/training_history"):
         os.makedirs(f"{OUTPUT_MODEL_DIR}/training_history/")
     plt.savefig(f"{OUTPUT_MODEL_DIR}/training_history/{filename}.png", dpi=128)
-# plot_training_results(model, history, EPOCHS, filename='history_VI_lenet_')
-# model.compile(loss='categorical_crossentropy',
-#             # optimizer=keras.optimizers.Adadelta(),
-#             optimizer=sgd,
-#             metrics=['accuracy'])
-# model.save(model_path, save_format='tf')  # 保存为tf格式，便于后续迁移调用   {filename}.h5", save_format='h5')
 
-
-# VI_resnet_model = import_model()
-prediction_uni = []
-label_uni = []
-# x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=False)  # ---orignal
-# x_train, x_test, y_train, y_test ,labels_literal= preprocess_test_VI_Images()
-# print('x_test[0]的shape：', x_test.shape)  # (1828, 128, 128, 1)
-# print('y_test[0]的shape：', y_test.shape)  # (1828, 16)
-# prediction = VI_resnet_model.predict(x_test[0])  # ndarry (1828,16)得到的是概率值
-# x_test = x_test.reshape(1463,128,128,1)
-# prediction = VI_resnet_model.predict(x_test[0])[2]  # ---orignal  x_test[0] # ndarry (1828,16)得到的是概率值
-# print('x_test的shape：', x_test.shape)  # (1828, 128, 128, 1)
-# print('prediction的shape：', prediction.shape)  # (1828, 16)
-# print('y_test的shape：', y_test.shape)  # (1828, 16)
-# print('y_test的shape：', y_test.shape)  # 'list' object has no attribute 'shape'
-# for j in range(len(prediction)):  # -------
-#     prediction_uni.append(np.argmax([prediction[j]]))  # 取出a中元素最大值所对应的索引
-#     label_uni.append(np.argmax([y_test[0][j]]))  # orignal: y_test[0][j]
-
-
-# confusionMatrix = tf.math.confusion_matrix(labels=label_uni, predictions=prediction_uni, num_classes=16)
-# df_cm = pd.DataFrame(confusionMatrix, index=[i for i in labels_literal],
-#                      columns=[i for i in labels_literal])
-# plt.figure(figsize=(12, 8))
-# sn.heatmap(df_cm, annot=True, fmt='g')
-# plt.tight_layout()
-# if not os.path.exists(f"{SAVE_DIR}/confusion_matrix"):
-#     os.makedirs(f"{SAVE_DIR}/confusion_matrix/")
-# plt.savefig(f"{SAVE_DIR}/confusion_matrix/confusion_matrix_03.png", dpi=128)
-# print(f"Confusion Matrix saved in '{SAVE_DIR}/confusion_matrix/'\n")
-
-# ----metrics----
-
-# prediction = model.predict(x_test[0])[2]
-# y_true = np.argmax(y_test[0], axis=1)  # ---orignal  y_test[0]
-# # y_true = np.argmax(y_test, axis=1)
-# # prediction = VI_resnet_model.predict(x_test[0])
-# prediction = np.argmax(prediction, axis=1)  # 取最大值的索引（0-15）作为预测标签
-# accuracy = accuracy_score(y_true, prediction)
-# precision = precision_score(y_true, prediction, average='macro')
-# recall = recall_score(y_true, prediction, average='macro')
-# f1 = f1_score(y_true, prediction, average='macro')
-# print('Accuracy: {:.2f}%'.format(accuracy * 100))
-# print('Error rate: {:.2f}%'.format((1 - accuracy) * 100))
-# print('Precision: {:.2f}%'.format(precision * 100))
-# print('Recall: {:.2f}%'.format(recall * 100))
-# print('F1: {:.2f}%'.format(f1 * 100))
-#
-# prediction_1 = model.predict(x_test[1])[2]
-# y_true_1 = np.argmax(y_test[1], axis=1)  # ---orignal  y_test[0]
-# prediction_1 = np.argmax(prediction_1, axis=1)  # 取最大值的索引（0-15）作为预测标签
-# accuracy_1 = accuracy_score(y_true_1, prediction_1)
-# precision_1 = precision_score(y_true_1, prediction_1, average='macro')
-# recall_1 = recall_score(y_true_1, prediction_1, average='macro')
-# f1_1 = f1_score(y_true_1, prediction_1, average='macro')
-# print('accuracy_1: {:.2f}%'.format(accuracy_1 * 100))
-# print('Error rate: {:.2f}%'.format((1 - accuracy_1) * 100))
-# print('Precision_1: {:.2f}%'.format(precision_1 * 100))
-# print('Recall_1: {:.2f}%'.format(recall_1 * 100))
-# print('F1_1: {:.2f}%'.format(f1_1 * 100))
-#
-# prediction_2 = model.predict(x_test[2])[2]
-# y_true_2 = np.argmax(y_test[2], axis=1)  # ---orignal  y_test[0]
-# prediction_2 = np.argmax(prediction_2, axis=1)  # 取最大值的索引（0-15）作为预测标签
-# accuracy_2 = accuracy_score(y_true_2, prediction_2)
-# precision_2 = precision_score(y_true_2, prediction_2, average='macro')
-# recall_2 = recall_score(y_true_2, prediction_1, average='macro')
-# f1_2 = f1_score(y_true_2, prediction_2, average='macro')
-# print('accuracy_2: {:.2f}%'.format(accuracy_2 * 100))
-# print('Error rate: {:.2f}%'.format((1 - accuracy_2) * 100))
-# print('Precision_2: {:.2f}%'.format(precision_2 * 100))
-# print('Recall_2: {:.2f}%'.format(recall_2 * 100))
-# print('F1_2: {:.2f}%'.format(f1_2 * 100))
-#
-# prediction_3 = model.predict(x_test[3])[2]
-# y_true_3 = np.argmax(y_test[3], axis=1)  # ---orignal  y_test[0]
-# prediction_3 = np.argmax(prediction_3, axis=1)  # 取最大值的索引（0-15）作为预测标签
-# accuracy_3 = accuracy_score(y_true_3, prediction_3)
-# precision_3 = precision_score(y_true_3, prediction_3, average='macro')
-# recall_3 = recall_score(y_true_3, prediction_3, average='macro')
-# f1_3 = f1_score(y_true_3, prediction_3, average='macro')
-# print('accuracy_3: {:.2f}%'.format(accuracy_3 * 100))
-# print('Error rate: {:.2f}%'.format((1 - accuracy_3) * 100))
-# print('Precision_3: {:.2f}%'.format(precision_3 * 100))
-# print('Recall_3: {:.2f}%'.format(recall_3 * 100))
-# print('F1_3: {:.2f}%'.format(f1_3 * 100))
-#
-#
-# x_train, y_train, x_test, y_test, le, labels_literal = process_data_VI_Images(k_folds=False)  # ---orignal
-# prediction = model.predict(x_test[0])[2]
-# y_true = np.argmax(y_test[0], axis=1)  # ---orignal  y_test[0]
-# # y_true = np.argmax(y_test, axis=1)
-# # prediction = VI_resnet_model.predict(x_test[0])
-# prediction = np.argmax(prediction, axis=1)  # 取最大值的索引（0-15）作为预测标签
-# accuracy = accuracy_score(y_true, prediction)
-# precision = precision_score(y_true, prediction, average='macro')
-# recall = recall_score(y_true, prediction, average='macro')
-# f1 = f1_score(y_true, prediction, average='macro')
-# print('Accuracy: {:.2f}%'.format(accuracy * 100))
-# print('Error rate: {:.2f}%'.format((1 - accuracy) * 100))
-# print('Precision: {:.2f}%'.format(precision * 100))
-# print('Recall: {:.2f}%'.format(recall * 100))
-# print('F1: {:.2f}%'.format(f1 * 100))
-
-# # ------------------begin---------------------
-# model.fit(x_train, [y_c1_train, y_c2_train, y_train],
-#           batch_size=batch_size,
-#           epochs=epochs,
-#           verbose=1,
-#           callbacks=cbks,
-#           validation_data=(x_test, [y_c1_test, y_c2_test, y_test]))
-# #---------------------------------------------------------------------------------
-# # The following compile() is just a behavior to make sure this model can be saved.
-# # We thought it may be a bug of Keras which cannot save a model compiled with loss_weights parameter
-# #---------------------------------------------------------------------------------
-# model.compile(loss='categorical_crossentropy',
-#             # optimizer=keras.optimizers.Adadelta(),
-#             optimizer=sgd,
-#             metrics=['accuracy'])
-#
-# # score = model.evaluate(x_test, [y_c1_test, y_c2_test, y_test], verbose=0)
-# # 使用 evaluate 函数计算每个输出层的指标
-# loss, c1_loss, c2_loss, y_loss, c1_acc, c2_acc, y_acc = model.evaluate(x_test, [y_c1_test, y_c2_test, y_test], verbose=0)
-# print('y_acc is: ', y_acc)
-# # 计算每个输出层的 F1-score
-# from sklearn.metrics import f1_score
-# import numpy as np
-#
-# c1_f1 = f1_score(np.argmax(y_c1_test, axis=1), np.argmax(model.predict(x_test)[0], axis=1), average='weighted')
-# c2_f1 = f1_score(np.argmax(y_c2_test, axis=1), np.argmax(model.predict(x_test)[1], axis=1), average='weighted')
-# y_f1 = f1_score(np.argmax(y_test, axis=1), np.argmax(model.predict(x_test)[2], axis=1), average='weighted')
-# print('y_f1 is: ', y_f1)
-# # model.save(model_path)
-# model.save(model_path, save_format='tf')  # 保存为tf格式，便于后续迁移调用   {filename}.h5", save_format='h5')
-# print(f"Model saved in '{model_path}'\n")
-#
-# prediction = model.predict(x_test)[2]  # ---orignal  x_test[0] # ndarry (1828,16)得到的是概率值
-# print('prediction的shape：', prediction[0].shape)  # (376, 2)
-# # print('y_test的shape：', y_test.shape)  # 'list' object has no attribute 'shape'
-# prediction_uni = []
-# label_uni = []
-# for j in range(len(prediction)):  # -------
-#     prediction_uni.append(np.argmax([prediction[j]]))  # 取出a中元素最大值所对应的索引
-#     label_uni.append(np.argmax([y_test[j]]))  # orignal: y_test[0][j]
-# confusionMatrix = tf.math.confusion_matrix(labels=label_uni, predictions=prediction_uni, num_classes=16)
-# df_cm = pd.DataFrame(confusionMatrix, index=[i for i in labels_literal],
-#                      columns=[i for i in labels_literal])
-# plt.figure(figsize=(12, 8))
-# sn.heatmap(df_cm, annot=True, fmt='g')
-# plt.tight_layout()
-#
-# # ----metrics----
-# y_true = np.argmax(y_test, axis=1)
-# print('y_test[0]:', y_test[0])
-# print('y_test[1]:', y_test[1])
-# prediction = np.argmax(prediction, axis=1)  # 取最大值的索引（0-15）作为预测标签
-# accuracy = accuracy_score(y_true, prediction)
-# print('Accuracy: {:.2f}%'.format(accuracy * 100))
-# print('Error rate: {:.2f}%'.format((1 - accuracy) * 100))
-# precision = precision_score(y_true, prediction, average='macro')
-# recall = recall_score(y_true, prediction, average='macro')
-# f1 = f1_score(y_true, prediction, average='weighted')
-# print('Precision: {:.2f}%'.format(precision * 100))
-# print('Recall: {:.2f}%'.format(recall * 100))
-# print('F1: {:.2f}%'.format(f1 * 100))
-# # ----metrics----
-#
-# # 预测测试集的最后一层分类结果
-# # y_pred = model.predict(x_test)[2]
-# # y_pred = np.argmax(y_pred, axis=1)
-# # y_true = np.argmax(y_test, axis=1)
-# # # 计算 precision、recall、F1-score
-# # # target_names = ['class_{}'.format(i) for i in range(k)]
-# # # print(classification_report(y_true, y_pred, target_names=target_names))
-# #
-# # # 计算 accuracy
-# # loss, c1_loss, c2_loss, y_loss, c1_acc, c2_acc, y_acc = model.evaluate(x_test, [y_c1_test, y_c2_test, y_test], verbose=0)
-# # print('Accuracy:', y_acc)
-# # precision, recall, f1, support = precision_recall_fscore_support(y_true, y_pred, average='weighted')
-# # print('Precision:', precision)
-# # print('Recall:', recall)
-# # print('F1-score:', f1)
-# # -----------------end---------------------
