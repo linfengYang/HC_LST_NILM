@@ -40,10 +40,8 @@ from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow import keras
 
-EPOCHS = 60 # 100  # ---
-EPOCHS_LENET = 10
-IMG_WIDTH = 56 # 128
-IMG_HEIGHT = 56 # 128
+IMG_WIDTH = 56 
+IMG_HEIGHT = 56 
 NUM_CATEGORIES = 11
 INPUT_IMAGE_DIR = "images/VI_images_test/2017Sub_one/"  # ----
 INPUT_MODEL_DIR = "models"
@@ -66,8 +64,8 @@ num_c_2 = 4
 #--- fine classes ---
 num_classes = 11
 
-batch_size = 128
-epochs = 75  # 75 or 90
+batch_size = 16
+epochs = 75  # 75 or 90 for PLAID 2014:70 is enough
 
 #--- file paths ---
 log_filepath = './tb_log_medium_dynamic/'
@@ -76,6 +74,7 @@ train_id = '1'
 model_name = 'BCNN_SVHN'+train_id
 model_path = os.path.join(weights_store_filepath, model_name)
 
+# for PLAID_2017: 
 def scheduler(epoch):
   learning_rate_init = 0.003
   if epoch > 40:
@@ -83,6 +82,15 @@ def scheduler(epoch):
   if epoch > 55:
     learning_rate_init = 0.0006 
   return learning_rate_init
+
+# for PLAID_2014: 
+# def scheduler(epoch):
+#   learning_rate_init = 0.003
+#   if epoch > 40:
+#     learning_rate_init = 0.0015  
+#   if epoch > 55:
+#     learning_rate_init = 0.0004 
+#   return learning_rate_init
 
 class LossWeightsModifier(tf.keras.callbacks.Callback):
   def __init__(self, alpha, beta, gamma):
@@ -112,19 +120,6 @@ def import_model():
     model = tf.keras.models.load_model(f"{INPUT_MODEL_DIR}/{filename}")  # {filename}.h5")
     model.summary()
     return model
-def load_data(data_dir):
-    images = []
-    labels = []
-    labels_literal = []
-    for category in os.listdir(data_dir):  
-        for img_file in os.listdir(os.path.join(data_dir, category)):  
-            img = cv2.imread(os.path.join(data_dir, category, img_file)) 
-            # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) 
-            img = np.array(img) 
-            images.append(img)
-            labels.append(str(category))  
-        labels_literal.append(str(category)) 
-    return (images, labels), labels_literal
 def load_data_1(data_dir):
     Class = ['Air Conditioner', 'Compact Fluorescent Lamp', 'Fan', 'Fridge', 'Hairdryer', 'Heater',
              'Incandescent Light Bulb', 'Laptop', 'Microwave', 'Vacuum','Washing Machine']
@@ -601,12 +596,12 @@ def get_net_model(alpha, beta, gamma):
 #     ST1 = Add()([ST1, ST1_mid])   
     
     ST2 = SwinTransformer(
-        dim=embed_dim,  # ----------------------
+        dim=embed_dim, 
         num_patch=(num_patch_x, num_patch_y),
-        num_heads=num_heads,  # ----------------------
+        num_heads=num_heads, 
         window_size=window_size,
         shift_size=shift_size,
-        num_mlp=num_mlp,  # -------------------
+        num_mlp=num_mlp, 
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(ST1)
