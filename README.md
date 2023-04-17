@@ -18,6 +18,12 @@ images
 
 In our experiment, we found that some hyperparameters may greatly affect the identification performance, so, manual adjustment of these hyperparameters (the learning rate, batchsize, etc) may be required in different environments. Recommend to use free GPU resource in Colab environment.
 
+ '''
+  A problem has occured when I try to save the best model to conduct the predict, 
+  hence the final results are lower than theory (this can be seen by observing the last layer accuracy fluctuating in training). 
+  Our paper use the mean value of 3 experiment results as the final results.
+ '''
+ 
 Acknowledgement:
 https://github.com/zhuxinqimac/B-CNN
 https://github.com/keras-team/keras-io/blob/master/examples/vision/swin_transformers.py
@@ -26,8 +32,23 @@ Contact e-mail:
 2113301058@st.gxu.edu.cn
 
 # 中文
-根据上述链接下载好数据集，然后预处理画出VI轨迹图，以他们电器的名称作为文件夹依次存放.
+根据上述链接下载好数据集，然后预处理画出VI轨迹图，以他们电器的名称作为文件夹依次存放(预处理好的数据集可能稍后会公开).
 注意tensorflow版本大于等于2.5.0
+由于环境可能不同，因此，可能需要手动调整一些超参数(如学习率变化，batchsize等)以产生更好的识别结果。
+对于batchsize，实验发现16，32，64，128产生的结果会有些许变化，因此如果GPU显存大于10G的话推荐先采用128，根据结果看是否需要进一步减小。
+推荐使用Colab免费平台及Autodl平台
+
+由于主要使用的是10折交叉验证进行模型评估，因此每一折训练完后，照理应该保存最优模型再进行这一折的测试，但在保存模型时出现了一个暂未解决的bug，
+因此最终产生的结果肯定是比理论值更低的，原本想拿几个一区的论文进行比较，由于此bug并未解决，因此只能采用本实验的结果，欢迎解决的大佬在评论区留言或私信
+
+验证对VI轨迹做的预处理在不同的评估方法上（K折，8：2）得到的结果会有差异，主要表现在：K折缩小了差距（因为9折训练，1折测试）
+
+这个VI轨迹其实有个问题，就是样本数太少，我也看过一些研究采用一个CSV画多个VI轨迹图，但根据我实验发现，这会使得整体指标都往上提高不少，因此个人不推荐使用此方法。
+所以对于VI轨迹图数量较少，模型会更容易过拟合，因此本文注释处原本采取了三个数据增强方法（Flip,Crop,Rotation）,但训练的epoch会增大几倍（大概需要180轮），得到的结果确是相近的。因此本文最终只采用RandomFlip，根据论文中画出的acc曲线可以看出，存在过拟合的趋势，但是性价比很高。
+
+总而言之，论文尚有诸多小问题尚待优化，欢迎批评指正
+Contact e-mail:
+2113301058@st.gxu.edu.cn
 
 
 
