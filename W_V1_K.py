@@ -107,32 +107,6 @@ def import_model():
     model = tf.keras.models.load_model(f"{INPUT_MODEL_DIR}/{filename}")  # {filename}.h5")
     model.summary()
     return model
-def load_data(data_dir):
-    """
-    Load image data from directory `data_dir`.
-
-    Assume `data_dir` has one directory named after each category.\
-    Inside each category directory will be some number of image files.
-
-    Return tuple `(images, labels)`. `images` should be a list of all
-    of the images in the data directory, where each image is formatted as a
-    numpy ndarray with dimensions IMG_WIDTH x IMG_HEIGHT x 1. `labels` should
-    be a list of strings (ex: 'Laptop', 'Blender', ...), \
-    representing the categories for each of the
-    corresponding `images/loads`.
-    """
-    images = []
-    labels = []
-    labels_literal = []
-    for category in os.listdir(data_dir):  
-        for img_file in os.listdir(os.path.join(data_dir, category)):  
-            img = cv2.imread(os.path.join(data_dir, category, img_file))  
-            # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # cv2.COLOR_BGR2GRAY 将BGR格式转换成灰度图片
-            img = np.array(img)  
-            images.append(img)
-            labels.append(str(category)) 
-        labels_literal.append(str(category))  
-    return (images, labels), labels_literal
 def load_data_1(data_dir):
     Class = ['AC', 'AirPump', 'BenchGrinder', 'CableModem', 'CableReceiver', 'CFL', 'Charger',
              'CoffeeMachine', 'DeepFryer', 'DesktopPC', 'Desoldering', 'DrillingMachine', 'Fan', 'FanHeater',
@@ -173,8 +147,7 @@ def process_data_VI_Images(k_folds=True):
     X = X/255  
     print('X[0]-----after:', X[0])
     Y = np.array(labels)
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  #-------------------------------------
-
+    skf = StratifiedKFold(n_splits=5, shuffle=True)  
     i = 0
     X_train = []
     X_test = []
@@ -684,12 +657,12 @@ def get_net_model(alpha, beta, gamma):
 #     ST1 = Add()([ST1, ST1_mid])   
     
     ST2 = SwinTransformer(
-        dim=embed_dim,  # ----------------------
+        dim=embed_dim, 
         num_patch=(num_patch_x, num_patch_y),
-        num_heads=num_heads,  # ----------------------
+        num_heads=num_heads, 
         window_size=window_size,
         shift_size=shift_size,
-        num_mlp=num_mlp,  # -------------------
+        num_mlp=num_mlp, 
         qkv_bias=qkv_bias,
         dropout_rate=dropout_rate,
     )(ST1)
