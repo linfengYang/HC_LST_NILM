@@ -13,11 +13,17 @@ Our study requires TensorFlow 2.5 or higher, as well as TensorFlow Addons.
 
 Then you can generate the VI trajectories (with the appliance name as the foldname), the save path is as follows:
 images
+
   VI_images_test
+  
     2017Sub_one
+    
     2014Sub_one
+    
     2018Sub_one
+    
     2018Agg_one
+    
     Whited
 
 In our experiment, we found that some hyperparameters may greatly affect the identification performance, so, manual adjustment of these hyperparameters (the learning rate, batchsize, etc) may be required in different environments. Recommend to use free GPU resource in Colab environment.
