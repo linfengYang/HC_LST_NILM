@@ -67,7 +67,7 @@ num_c_2 = 4
 num_classes = 11
 
 batch_size = 128
-epochs = 80  # 75 or 90
+epochs = 75  # 75 or 90
 
 #--- file paths ---
 log_filepath = './tb_log_medium_dynamic/'
