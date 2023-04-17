@@ -38,8 +38,6 @@ import numpy as np
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow import keras
-EPOCHS = 60 
-EPOCHS_LENET = 10
 IMG_WIDTH = 56 
 IMG_HEIGHT = 56 
 NUM_CATEGORIES = 13
