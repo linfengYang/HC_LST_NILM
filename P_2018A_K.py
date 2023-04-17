@@ -105,32 +105,7 @@ class LossWeightsModifier(tf.keras.callbacks.Callback):
       K.set_value(self.alpha, 0)
       K.set_value(self.beta, 0)
       K.set_value(self.gamma, 1)
-def load_data(data_dir):
-    """
-    Load image data from directory `data_dir`.
 
-    Assume `data_dir` has one directory named after each category.\
-    Inside each category directory will be some number of image files.
-
-    Return tuple `(images, labels)`. `images` should be a list of all
-    of the images in the data directory, where each image is formatted as a
-    numpy ndarray with dimensions IMG_WIDTH x IMG_HEIGHT x 1. `labels` should
-    be a list of strings (ex: 'Laptop', 'Blender', ...), \
-    representing the categories for each of the
-    corresponding `images/loads`.
-    """
-    images = []
-    labels = []
-    labels_literal = []
-    for category in os.listdir(data_dir): 
-        for img_file in os.listdir(os.path.join(data_dir, category)): 
-            img = cv2.imread(os.path.join(data_dir, category, img_file)) 
-            # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # cv2.COLOR_BGR2GRAY 将BGR格式转换成灰度图片
-            img = np.array(img)  
-            images.append(img)
-            labels.append(str(category)) 
-        labels_literal.append(str(category)) 
-    return (images, labels), labels_literal
 def load_data_1(data_dir):
     Class = ['Air Conditioner', 'Blender','Coffee maker', 'Compact Fluorescent Lamp', 'Fan', 'Fridge', 'Fridge defroster',
              'Hair Iron', 'Incandescent Light Bulb', 'Iron solder','Laptop', 'Vacuum', 'Water kettle']
@@ -775,6 +750,11 @@ for i in range(len(x_train)):
                             verbose=1,
                             callbacks=cbks,
                             validation_data=(x_test[i], [y_c1_test[i], y_c2_test[i], y_test[i]])))
+    '''
+    A problem has occured when I try to save the best model to conduct the predict, 
+    hence the final results are lower than theory(this can be seen by observing the last layer accuracy fluctuating in training). 
+    Our paper use the mean value of 3 experiment results as the final results.
+    '''
     prediction = model.predict(x_test[i])[2]
     y_true = np.argmax(y_test[i], axis=1)  
     prediction = np.argmax(prediction, axis=1)  
