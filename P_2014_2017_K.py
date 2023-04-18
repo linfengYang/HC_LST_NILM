@@ -65,7 +65,7 @@ num_c_2 = 4
 num_classes = 11
 
 batch_size = 16
-epochs = 75  # 75 or 90 for PLAID 2014:70 is enough
+epochs = 75  # 75 or 90 . For PLAID 2014, 70 is enough
 
 #--- file paths ---
 log_filepath = './tb_log_medium_dynamic/'
