@@ -36,10 +36,6 @@ In our experiment, we found that some hyperparameters may greatly affect the ide
   hence the final results are lower than theory (this can be seen by observing the last layer accuracy fluctuating in training). 
   Our paper use the mean value of 3 experiment results as the final results.
  '''
- 
-Acknowledgement:
-https://github.com/zhuxinqimac/B-CNN
-https://github.com/keras-team/keras-io/blob/master/examples/vision/swin_transformers.py
 
 Contact e-mail:
 2113301058@st.gxu.edu.cn
